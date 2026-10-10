@@ -1,0 +1,140 @@
+:root {
+  /* --- Primary Brand Colors --- */
+  --cap-symbol-blue: #001871;
+  --cap-silver-gray: #9ea2a2;
+
+  /* --- Secondary & Accent Colors --- */
+  --cap-scarlet-red: #ba0c2f;
+  --cap-af-yellow: #ffcd00;
+  --cap-black: #000000;
+  --cap-white: #ffffff;
+
+  /* --- Supplemental Colors (20% Tint) --- */
+  --cap-symbol-blue-20: #ccd1e3;
+  --cap-scarlet-red-20: #f1ced5;
+  --cap-af-yellow-20: #fff5cc;
+  --cap-silver-gray-20: #ececec;
+
+  /* --- Limited Use Colors --- */
+  --cap-navy: #111728;
+  --cap-sky-blue: #99b9ca;
+}
+
+/* STREAMING_CHUNK:Styling layout, typography, barcode font, custom scrollbars, and print layouts... */
+.barcode-font {
+    font-family: 'Libre Barcode 39 Text', cursive;
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Modal animation utilities */
+.modal-enter {
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Print CSS formatting for physical tag stickers */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background-color: white !important;
+    }
+
+    #print-modal {
+        position: absolute !important;
+        inset: 0 !important;
+        background: white !important;
+        padding: 0 !important;
+    }
+
+    #print-modal>div {
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    #printable-tags-grid {
+        grid-template-cols: repeat(3, minmax(0, 1fr)) !important;
+        gap: 15px !important;
+    }
+}
+
+/* Booster Club Non-Profit Footer Styles */
+.site-footer {
+    @apply bg-slate-900 text-slate-400 border-t border-slate-800 text-xs py-8 px-4 mt-auto no-print;
+}
+
+.footer-container {
+    @apply max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-start;
+}
+
+.footer-brand {
+    @apply space-y-2;
+}
+
+.footer-title {
+    @apply font-extrabold text-sm text-white tracking-tight flex items-center gap-2;
+}
+
+.footer-badge {
+    @apply inline-block bg-brand-500/10 text-brand-400 font-bold px-2 py-0.5 rounded border border-brand-500/20 text-[10px] uppercase tracking-wider;
+}
+
+/* Header & Footer Overlay Modal Styles */
+.modal-overlay {
+    @apply fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-200 no-print;
+}
+
+.modal-content {
+    @apply bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200;
+}
+
+.modal-header-nav {
+    @apply bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800;
+}
+
+.modal-body-scroll {
+    @apply p-6 overflow-y-auto flex-1 space-y-4 text-slate-800;
+}
+
+/* Floating Trigger Buttons (For opening Header/Footer Modals) */
+.btn-floating-nav {
+    @apply fixed top-4 right-4 z-40 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 hover:bg-slate-800 font-bold text-xs flex items-center gap-2 cursor-pointer transition no-print;
+}
+
+.btn-floating-footer {
+    @apply fixed bottom-4 left-4 z-40 bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl shadow-lg font-extrabold text-xs flex items-center gap-2 cursor-pointer transition no-print;
+}

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquipShare | Shop</title>
+
+    <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        barcode: ['"Libre Barcode 39 Text"', 'cursive'],
+                    },
+                    colors: {
+                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 900: '#14532d' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+
+    <script type="module" src="/js/components.js"></script>
+</head>
+
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+    <app-header></app-header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- STATS & FINANCIAL DASHBOARD -->
+        <div class="grid grid-cols-3 lg:grid-cols-4 gap-4 mb-6 no-print">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="text-xs text-slate-500 font-medium flex justify-between items-center">
+                    <span>Total Supply Value</span>
+                    <i class="fa-solid fa-sack-dollar text-slate-400"></i>
+                </div>
+                <div id="stat-total-value" class="text-2xl font-extrabold text-slate-900 mt-2">$0.00</div>
+                <div class="text-[11px] text-slate-400 mt-1"><span id="stat-total-items">0</span> total slots</div>
+            </div>
+
+            <div
+                class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-brand-500 flex flex-col justify-between">
+                <div class="text-xs text-slate-500 font-medium flex justify-between items-center">
+                    <span>Value Saved by Members</span>
+                    <i class="fa-solid fa-vault text-brand-500"></i>
+                </div>
+                <div id="stat-out-value" class="text-2xl font-extrabold text-brand-600 mt-2">$0.00</div>
+                <div class="text-[11px] text-slate-400 mt-1"><span id="stat-out-items">0</span> items borrowed</div>
+            </div>
+
+            <div
+                class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500 flex flex-col justify-between">
+                <div class="text-xs text-slate-500 font-medium flex justify-between items-center">
+                    <span>Value In Supply</span>
+                    <i class="fa-solid fa-hand-holding-dollar text-amber-500"></i>
+                </div>
+                <div id="stat-in-value" class="text-2xl font-extrabold text-amber-600 mt-2">$0.00</div>
+                <div class="text-[11px] text-slate-400 mt-1"><span id="stat-in-items">0</span> unique available listings</div>
+            </div>
+        </div>
+
+        <!-- MEMBER SHOPPING CATALOG -->
+        <section id="view-shop" class="space-y-5">
+            <div
+                class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 border border-slate-700">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Browse Supply Catalog</h1>
+                    <p class="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
+                        Add supply items to your Cart. If an item is out of stock, members can click the
+                        <strong>Vanguard link</strong> to purchase directly, or a member of staff can request a <strong>Booster Club
+                            order</strong>.
+                    </p>
+                </div>
+                <div
+                    class="bg-slate-800/90 p-3.5 rounded-xl border border-slate-700 text-xs text-slate-300 flex items-center gap-2">
+                    <div class="text-brand-500 text-3xl"><i class="fa-solid fa-boxes-packing"></i></div>
+                    <div>
+                        <strong class="text-white block">Out-of-Stock Workflows:</strong>
+                        • Direct Purchase via Vanguard Store<br>
+                        • Staff Request Order to Booster Club
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolbar & Search -->
+            <div
+                class="bg-white rounded-xl shadow-sm p-1.5 border border-slate-200 flex flex-col md:flex-row gap-1.5 justify-between items-center">
+                <div class="relative w-full md:w-80">
+                    <i
+                        class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="shop-search" placeholder="Search title, location code (e.g. AA-01)..."
+                        class="w-full pl-8 pr-3 py-1 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 text-[11px] transition">
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                    <select id="shop-category"
+                        class="bg-slate-50 border border-slate-300 text-slate-700 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        <option value="ALL">All Categories</option>
+                        <option value="Insignia">Insignia & Badges</option>
+                        <option value="Hanging">Hanging Apparel</option>
+                        <option value="Shelves">Shelved Goods</option>
+                        <option value="Outerwear">Outerwear & Coats</option>
+                        <option value="Shoes">Footwear & Boots</option>
+                        <option value="Accessories">Accessories & Gear</option>
+                    </select>
+
+                    <select id="shop-status-filter"
+                        class="bg-slate-50 border border-slate-300 text-slate-700 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        <option value="IN">Show Available (In Supply)</option>
+                        <option value="ALL">Show All Items</option>
+                        <option value="OUT">Show Out of Stock / Vanguard</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="shop-items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+        </section>
+    </main>
+
+    <app-footer></app-footer>
+    <script type="module" src="/pages/shop.js"></script>
+</body>
+
+</html>
