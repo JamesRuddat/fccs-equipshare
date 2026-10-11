@@ -10,6 +10,9 @@ import {
     updateUserRoleInDB 
 } from '/js/firebase-db.js';
 
+// Fallback image asset
+const CAP_FALLBACK_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg/250px-Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg.png';
+
 document.addEventListener('DOMContentLoaded', () => {
     initAuth(async (user) => {
         AppState.currentUser = user;
@@ -114,7 +117,7 @@ function setupAdminFilters() {
     document.getElementById('btn-close-item-modal')?.addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-item-modal')?.addEventListener('click', closeItemModal);
 
-    // Event delegation for Supply Table (Inline Stock Adjustments & Edits)
+    // Event delegation for Supply Table
     document.getElementById('admin-table-body')?.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('[data-action="edit-item"]');
         const adjustStockBtn = e.target.closest('[data-action="adjust-stock"]');
@@ -139,7 +142,27 @@ function setupAdminFilters() {
                 await refreshAllData();
                 showToast("Item marked as ISSUED and handed out!");
             } catch (err) {
-                alert("Failed to issue item: " + err.message);
+                if (window.showAlert) {
+                    window.showAlert("Failed to issue item", err.message, "error");
+                }
+            }
+        }
+    });
+
+    // Event delegation for User Roles Table
+    document.getElementById('user-roles-list')?.addEventListener('change', async (e) => {
+        const selectEl = e.target.closest('[data-action="update-user-role"]');
+        if (selectEl) {
+            const uid = selectEl.dataset.uid;
+            const newRole = selectEl.value;
+            try {
+                await updateUserRoleInDB(uid, newRole);
+                showToast("User role updated successfully!");
+                await refreshAllData();
+            } catch (err) {
+                if (window.showAlert) {
+                    window.showAlert("Failed to update role", err.message, "error");
+                }
             }
         }
     });
@@ -156,18 +179,11 @@ function setupAdminFilters() {
     if (btnCloseBulk) btnCloseBulk.addEventListener('click', () => bulkModal?.classList.add('hidden'));
     if (btnCancelBulk) btnCancelBulk.addEventListener('click', () => bulkModal?.classList.add('hidden'));
 
-    if (btnSampleData) {
-        btnSampleData.addEventListener('click', () => {
-            const textarea = document.getElementById('bulk-import-textarea');
-            if (textarea) textarea.value = JSON.stringify(SAMPLE_INVENTORY_ARRAY, null, 2);
-        });
-    }
-
     if (btnRunBulk) {
         btnRunBulk.addEventListener('click', async () => {
             const rawCode = document.getElementById('bulk-import-textarea')?.value;
             if (!rawCode || !rawCode.trim()) {
-                alert("Please paste a JavaScript or JSON inventory array first.");
+                if (window.showAlert) window.showAlert("Hold up", "Please paste a JavaScript or JSON inventory array first.", "error");
                 return;
             }
 
@@ -187,7 +203,7 @@ function setupAdminFilters() {
                 await refreshAllData();
             } catch (err) {
                 console.error("Bulk import parsing failed:", err);
-                alert("Import failed: " + err.message);
+                if (window.showAlert) window.showAlert("Import failed", err.message, "error");
             } finally {
                 btnRunBulk.disabled = false;
                 btnRunBulk.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Execute Import`;
@@ -278,7 +294,7 @@ async function quickAdjustItemStock(itemId, sizeKey, delta) {
         showToast(`Updated ${item.title} (${sizeKey}: ${newQty})`);
     } catch (err) {
         console.error("Stock adjustment failed:", err);
-        alert("Could not update stock: " + err.message);
+        if (window.showAlert) window.showAlert("Could not update stock", err.message, "error");
     }
 }
 
@@ -317,7 +333,6 @@ function renderAdminTable() {
             </div>
         `).join('');
 
-        // Dynamic Status Badge
         let statusBadge = '';
         if (item.status === 'IN') {
             statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800">In Stock</span>`;
@@ -334,7 +349,7 @@ function renderAdminTable() {
         return `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
                 <td class="p-2 w-12">
-                    <img src="${thumbSrc}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=100';" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-sm">
+                    <img src="${thumbSrc}" onerror="this.onerror=null; this.src='${CAP_FALLBACK_IMAGE}';" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-sm">
                 </td>
                 <td class="p-3 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
                 <td class="p-3 text-slate-600">${item.location || 'Closet Slot'}</td>
@@ -438,7 +453,7 @@ async function handleItemFormSubmit() {
     document.getElementById('form-location-code').value = formattedTag;
 
     if (!isValidLocationCode(formattedTag)) {
-        alert("Invalid Location Tag format! Please use 2 letters followed by 2 numbers (e.g. AA-00 or A1-04).");
+        if (window.showAlert) window.showAlert("Invalid Location Tag format!", "Please use 2 letters followed by 2 numbers (e.g. AA-00 or A1-04).", "error");
         document.getElementById('form-location-code').focus();
         return;
     }
@@ -466,11 +481,10 @@ async function handleItemFormSubmit() {
         await refreshAllData();
         closeItemModal();
     } catch (err) {
-        alert("Failed to save item: " + err.message);
+        if (window.showAlert) window.showAlert("Failed to save item", err.message, "error");
     }
 }
 
-/* --- MEMBER DIRECTORY & USER ROLES --- */
 /* --- MEMBER DIRECTORY & RESPONSIBILITY LOGIC --- */
 export function renderMembersGrid() {
     const container = document.getElementById('members-grid');
@@ -493,7 +507,6 @@ export function renderMembersGrid() {
         const memberName = member.fullName || '';
         const memberUid = member.uid || member.id;
 
-        // 1. Items currently ISSUED (on active loan to this member)
         const issuedItems = (AppState.supply || []).filter(item => 
             item.status === 'ISSUED' && (
                 (memberUid && item.lastIssuedToUid === memberUid) ||
@@ -502,7 +515,6 @@ export function renderMembersGrid() {
             )
         );
 
-        // 2. Items REQUESTED (pending pickup at supply desk)
         const requestedItems = (AppState.supply || []).filter(item => 
             item.status === 'REQUESTED' && (
                 (memberUid && item.requestedByUid === memberUid) ||
@@ -511,10 +523,8 @@ export function renderMembersGrid() {
             )
         );
 
-        // Calculate total monetary liability for issued property
         const totalValueOwed = issuedItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
 
-        // Render Issued Items list HTML
         const issuedItemsHtml = issuedItems.length > 0 ? issuedItems.map(item => `
             <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100">
                 <div class="truncate pr-2">
@@ -525,7 +535,6 @@ export function renderMembersGrid() {
             </div>
         `).join('') : `<p class="text-[11px] text-slate-400 italic py-1">No property currently on issue.</p>`;
 
-        // Render Requested Items list HTML
         const requestedItemsHtml = requestedItems.length > 0 ? requestedItems.map(item => `
             <div class="flex items-center justify-between text-xs py-1 border-b border-amber-100/60 bg-amber-50/50 px-2 rounded">
                 <div class="truncate pr-2">
@@ -539,7 +548,6 @@ export function renderMembersGrid() {
         return `
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition p-5 flex flex-col justify-between space-y-4">
                 <div class="space-y-3">
-                    <!-- Member Header -->
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 font-extrabold flex items-center justify-center text-sm shadow-inner">
                             ${(memberName || 'M').charAt(0).toUpperCase()}
@@ -552,13 +560,11 @@ export function renderMembersGrid() {
                         </div>
                     </div>
 
-                    <!-- Contact Details -->
                     <div class="text-xs space-y-1 text-slate-500 pt-1 border-t border-slate-100">
                         <div><i class="fa-regular fa-envelope mr-1.5 text-slate-400"></i>${member.email || 'N/A'}</div>
                         <div><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i>${member.phone || 'N/A'}</div>
                     </div>
 
-                    <!-- Pending Pickup Requests Section -->
                     ${requestedItems.length > 0 ? `
                         <div class="space-y-1 pt-2">
                             <div class="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
@@ -570,7 +576,6 @@ export function renderMembersGrid() {
                         </div>
                     ` : ''}
 
-                    <!-- Issued Equipment Breakdown -->
                     <div class="space-y-1 pt-2">
                         <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
                             <i class="fa-solid fa-boxes-packing text-brand-600"></i> Issued Equipment (${issuedItems.length})
@@ -581,7 +586,6 @@ export function renderMembersGrid() {
                     </div>
                 </div>
 
-                <!-- Financial Liability Footer -->
                 <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between mt-2">
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Property On Loan</div>
@@ -599,9 +603,97 @@ export function renderMembersGrid() {
     }).join('');
 }
 
+/**
+ * Creates the DOM element for the New Member Registration Modal if it doesn't already exist.
+ */
+function createMemberModalElement() {
+    const modal = document.createElement('div');
+    modal.id = 'new-member-modal';
+    modal.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print';
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-extrabold text-slate-900 text-base">Add Temporary Member to Directory</h3>
+                <button id="btn-close-member-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="add-member-form" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                    <input type="text" id="member-full-name" required placeholder="e.g. John Doe" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                    <input type="email" id="member-email" required placeholder="cadet@wi055.cap.gov" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                    <input type="tel" id="member-phone" placeholder="(920) 555-0199" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Assigned Role</label>
+                    <select id="member-role" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        <option value="member">Cadet / Member</option>
+                        <option value="cadet_supply_officer">Cadet Supply Officer</option>
+                        <option value="supply_officer">Senior Supply Officer</option>
+                        <option value="cadet_commander">Cadet Commander</option>
+                        <option value="squadron_commander">Squadron Commander</option>
+                    </select>
+                </div>
+                
+                <div class="pt-2 flex items-center justify-end gap-2">
+                    <button type="button" id="btn-cancel-member-modal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-xl text-xs transition shadow-sm">
+                        Save Member
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    // Attach event listeners for closing
+    modal.querySelector('#btn-close-member-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.querySelector('#btn-cancel-member-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Submit handler
+    modal.querySelector('#add-member-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fullName = modal.querySelector('#member-full-name').value.trim();
+        const email = modal.querySelector('#member-email').value.trim();
+        const phone = modal.querySelector('#member-phone').value.trim();
+        const role = modal.querySelector('#member-role').value;
+
+        if (!fullName || !email) {
+            if (window.showAlert) window.showAlert("Required Fields", "Please enter both name and email.", "warning");
+            return;
+        }
+
+        try {
+            const newMember = { fullName, email, phone, role };
+            AppState.membersList = AppState.membersList || [];
+            AppState.membersList.push(newMember);
+
+            renderMembersGrid();
+            renderUserRolesTable(AppState.membersList);
+
+            modal.classList.add('hidden');
+            modal.querySelector('#add-member-form').reset();
+            showToast(`Added ${fullName} to directory!`);
+        } catch (err) {
+            if (window.showAlert) window.showAlert("Error", "Could not add member: " + err.message, "error");
+        }
+    });
+
+    return modal;
+}
+
 function setupMemberModalHandlers() {
     document.getElementById('btn-add-member')?.addEventListener('click', () => {
-        let modal = document.getElementById('new-member-modal');
+        let modal = document.getElementById('new-member-modal') || document.getElementById('member-modal');
         if (!modal) {
             modal = createMemberModalElement();
             document.body.appendChild(modal);
@@ -670,7 +762,7 @@ async function processBulkInventoryImport(itemsArray) {
 
     if (typeof showToast === 'function') {
         showToast(`Successfully imported ${successCount} items into Firestore!`);
-    } else {
-        alert(`Successfully imported ${successCount} items into Firestore!`);
+    } else if (window.showAlert) {
+        window.showAlert("Bulk Import Complete", `Successfully imported ${successCount} items into Firestore!`, "success");
     }
 }

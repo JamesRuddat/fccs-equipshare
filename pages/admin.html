@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EquipShare | Admin & Management Console</title>
-    
+    <link rel="icon" type="image/x-icon" href="/assets/Awesome-Boxes-Packing.svg">
+
     <script>window.process = { env: { NODE_ENV: 'production' } };</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -23,33 +25,41 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    
+
     <script type="module" src="/js/components.js"></script>
 </head>
+
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
 
     <app-header></app-header>
 
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        
+
         <!-- Top Summary Bar & Tab Controller -->
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div
+            class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h2 class="text-xl font-extrabold text-slate-900">Admin & Management Dashboard</h2>
-                <p class="text-slate-500 text-xs">Manage inventory stock, inline quantities, local image paths, member liabilities, and user roles.</p>
+                <p class="text-slate-500 text-xs">Manage inventory stock, inline quantities, local image paths, member
+                    liabilities, and user roles.</p>
             </div>
 
             <!-- Tab Buttons -->
             <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1 w-full md:w-auto text-xs font-bold">
-                <button id="tab-btn-supply" class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition">
+                <button id="tab-btn-supply"
+                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition">
                     <i class="fa-solid fa-boxes-stacked mr-1.5 text-brand-600"></i>Supply
                 </button>
-                <button id="tab-btn-members" class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                <button id="tab-btn-members"
+                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
                     <i class="fa-solid fa-users mr-1.5 text-indigo-600"></i>Members & Liabilities
                 </button>
-                <button id="tab-btn-roles" class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                <button id="tab-btn-roles"
+                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
                     <i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i>Roles & Access
                 </button>
             </div>
@@ -57,59 +67,66 @@
 
         <!-- TAB 1: SUPPLY MASTER LOG -->
         <section id="tab-content-supply" class="tab-content space-y-4">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div
+                class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div class="relative w-full sm:w-80">
-                    <input type="text" id="admin-table-search" placeholder="Search tag, title, size, member..." 
+                    <input type="text" id="admin-table-search" placeholder="Search tag, title, size, member..."
                         class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <i
+                        class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-slate-500 font-medium">Filter:</span>
-                        <select id="admin-status-filter" class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-medium">
+                        <select id="admin-status-filter"
+                            class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-medium">
                             <option value="ALL">All Items</option>
                             <option value="IN">In Stock</option>
+                            <option value="ISSUED">Issued</option>
                             <option value="OUT">Out of Stock</option>
                         </select>
                     </div>
 
                     <div class="flex gap-2">
-                        <button id="btn-open-bulk-import" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <button id="btn-open-bulk-import"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-file-import"></i> Bulk Import
                         </button>
-                        <button id="btn-add-item-slot" class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <button id="btn-add-item-slot"
+                            class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                             <i class="fa-solid fa-plus"></i> Add Item
                         </button>
                     </div>
                 </div>
             </div>
-            
-<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-    <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-        <i class="fa-solid fa-clock text-amber-500"></i> Pending Member Requests (Orders)
-    </h3>
-    <table class="w-full text-left text-xs">
-        <thead>
-            <tr class="bg-slate-100 text-slate-600 font-bold border-b">
-                <th class="p-2">Location Tag</th>
-                <th class="p-2">Title</th>
-                <th class="p-2">Requested By</th>
-                <th class="p-2">Requested Size</th>
-                <th class="p-2 text-right">Action</th>
-            </tr>
-        </thead>
-        <tbody id="pending-orders-table-body">
-            <!-- Rendered dynamically -->
-        </tbody>
-    </table>
-</div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-clock text-amber-500"></i> Pending Member Requests (Orders)
+                </h3>
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 font-bold border-b">
+                            <th class="p-2">Location Tag</th>
+                            <th class="p-2">Title</th>
+                            <th class="p-2">Requested By</th>
+                            <th class="p-2">Requested Size</th>
+                            <th class="p-2 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-orders-table-body">
+                        <!-- Rendered dynamically -->
+                    </tbody>
+                </table>
+            </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                            <tr
+                                class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
                                 <th class="p-3 w-12">Image</th>
                                 <th class="p-3">Location</th>
                                 <th class="p-3">Area</th>
@@ -133,9 +150,11 @@
             <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div>
                     <h3 class="font-bold text-slate-900 text-sm">Active Members & Open Liabilities</h3>
-                    <p class="text-xs text-slate-500">Track current items issued per member and calculated replacement values.</p>
+                    <p class="text-xs text-slate-500">Track current items issued per member and calculated replacement
+                        values.</p>
                 </div>
-                <button id="btn-add-member" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
+                <button id="btn-add-member"
+                    class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-user-plus"></i> Add New Member
                 </button>
             </div>
@@ -167,7 +186,8 @@
     </main>
 
     <!-- BULK ARRAY IMPORT MODAL -->
-    <div id="bulk-import-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+    <div id="bulk-import-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 text-xs border border-slate-100">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
                 <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
@@ -177,22 +197,28 @@
                     <i class="fa-solid fa-xmark text-base"></i>
                 </button>
             </div>
-            
+
             <p class="text-slate-500 leading-relaxed">
-                Paste your JavaScript inventory array below. Items will be processed, given location tags, and saved to Firestore.
+                Paste your JavaScript inventory array below. Items will be processed, given location tags, and saved to
+                Firestore.
             </p>
 
             <div>
-                <textarea id="bulk-import-textarea" rows="10" placeholder='[&#10;  { title: "C/Amn Rank", qty: 24, cat: ["Insignia", "Ranks"], isOneSize: true }&#10;]' class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                <textarea id="bulk-import-textarea" rows="10"
+                    placeholder='[&#10;  { title: "C/Amn Rank", qty: 24, cat: ["Insignia", "Ranks"], isOneSize: true }&#10;]'
+                    class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
 
             <div class="flex justify-between items-center pt-2 border-t border-slate-100">
-                <button type="button" id="btn-load-sample-data" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                <button type="button" id="btn-load-sample-data"
+                    class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample List
                 </button>
                 <div class="flex gap-2">
-                    <button type="button" id="btn-cancel-bulk-modal" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition">Cancel</button>
-                    <button type="button" id="btn-run-bulk-import" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm flex items-center gap-1.5 transition">
+                    <button type="button" id="btn-cancel-bulk-modal"
+                        class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition">Cancel</button>
+                    <button type="button" id="btn-run-bulk-import"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm flex items-center gap-1.5 transition">
                         <i class="fa-solid fa-cloud-arrow-up"></i> Execute Import
                     </button>
                 </div>
@@ -201,7 +227,8 @@
     </div>
 
     <!-- UNIFIED ITEM MODAL (ADD & EDIT WITH IMAGE PICKER) -->
-    <div id="item-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="item-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
                 <h3 id="modal-title" class="font-bold text-sm">Add New Supply Item</h3>
@@ -216,58 +243,71 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Location Tag (AA-00) *</label>
-                        <input type="text" id="form-location-code" required placeholder="A1-04" class="w-full p-2.5 border border-slate-300 rounded-lg font-mono">
+                        <input type="text" id="form-location-code" required placeholder="A1-04"
+                            class="w-full p-2.5 border border-slate-300 rounded-lg font-mono">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Physical Location</label>
-                        <input type="text" id="form-location" placeholder="Closet Rack 2" class="w-full p-2.5 border border-slate-300 rounded-lg">
+                        <input type="text" id="form-location" placeholder="Closet Rack 2"
+                            class="w-full p-2.5 border border-slate-300 rounded-lg">
                     </div>
                 </div>
 
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Item Title *</label>
-                    <input type="text" id="form-title" required placeholder="Short Sleeve Blues Shirt - Male" class="w-full p-2.5 border border-slate-300 rounded-lg">
+                    <input type="text" id="form-title" required placeholder="Short Sleeve Blues Shirt - Male"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Replacement Value ($)</label>
-                        <input type="number" step="0.01" id="form-price" placeholder="45.00" class="w-full p-2.5 border border-slate-300 rounded-lg">
+                        <input type="number" step="0.01" id="form-price" placeholder="45.00"
+                            class="w-full p-2.5 border border-slate-300 rounded-lg">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Categories (Comma-separated)</label>
-                        <input type="text" id="form-categories" placeholder="Blues, Class A, Shirts" class="w-full p-2.5 border border-slate-300 rounded-lg">
+                        <input type="text" id="form-categories" placeholder="Blues, Class A, Shirts"
+                            class="w-full p-2.5 border border-slate-300 rounded-lg">
                     </div>
                 </div>
 
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Sizes & Quantities / Total Stock *</label>
-                    <input type="text" id="form-sizes" required placeholder='e.g., "10" (for one-size) OR "15.5R: 5, 16.0R: 3"' class="w-full p-2.5 border border-slate-300 rounded-lg font-mono">
+                    <input type="text" id="form-sizes" required
+                        placeholder='e.g., "10" (for one-size) OR "15.5R: 5, 16.0R: 3"'
+                        class="w-full p-2.5 border border-slate-300 rounded-lg font-mono">
                 </div>
 
                 <!-- IMAGE PICKER & FILE UPLOADER -->
                 <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                     <label class="block font-bold text-slate-700">Item Image (Local File or Server Path)</label>
-                    
+
                     <div class="flex items-center gap-3">
-                        <img id="modal-image-preview" src="" alt="Preview" class="w-12 h-12 rounded-lg object-cover border border-slate-300 hidden">
+                        <img id="modal-image-preview" src="" alt="Preview"
+                            class="w-12 h-12 rounded-lg object-cover border border-slate-300 hidden">
                         <div class="flex-1 space-y-1">
-                            <input type="text" id="form-image-path" placeholder="/images/products/A1-04.jpg" class="w-full p-2 border border-slate-300 rounded-lg text-[11px] font-mono">
-                            <input type="file" id="form-image-file" accept="image/*" class="block w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300">
+                            <input type="text" id="form-image-path" placeholder="/images/products/A1-04.jpg"
+                                class="w-full p-2 border border-slate-300 rounded-lg text-[11px] font-mono">
+                            <input type="file" id="form-image-file" accept="image/*"
+                                class="block w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300">
                         </div>
                     </div>
                 </div>
 
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Vanguard Store URL</label>
-                    <input type="url" id="form-vanguard-url" placeholder="https://www.vanguardmil.com/..." class="w-full p-2.5 border border-slate-300 rounded-lg">
+                    <input type="url" id="form-vanguard-url" placeholder="https://www.vanguardmil.com/..."
+                        class="w-full p-2.5 border border-slate-300 rounded-lg">
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" id="btn-cancel-item-modal" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">
+                    <button type="button" id="btn-cancel-item-modal"
+                        class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">
                         Cancel
                     </button>
-                    <button type="submit" id="btn-submit-item" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold shadow-sm">
+                    <button type="submit" id="btn-submit-item"
+                        class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold shadow-sm">
                         Save Item
                     </button>
                 </div>
@@ -278,4 +318,5 @@
     <app-footer></app-footer>
     <script type="module" src="/pages/admin.js"></script>
 </body>
+
 </html>

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EquipShare | Check-In & Return Console</title>
-    
+    <link rel="icon" type="image/x-icon" href="/assets/Awesome-Boxes-Packing.svg">
+
     <script>window.process = { env: { NODE_ENV: 'production' } };</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -23,33 +25,39 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
-    
+
     <script type="module" src="/js/components.js"></script>
 </head>
+
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
 
     <app-header></app-header>
 
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        
+
         <!-- Header & Scanner Bar -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h2 class="text-2xl font-extrabold text-slate-900">Return & Item Processing Console</h2>
-                <p class="text-slate-500 text-xs mt-0.5">Process incoming gear, verify unit stock history, evaluate returned condition, or clear outstanding member liabilities.</p>
+                <p class="text-slate-500 text-xs mt-0.5">Process incoming gear, verify unit stock history, evaluate
+                    returned condition, or clear outstanding member liabilities.</p>
             </div>
 
             <div class="flex items-center gap-2 w-full md:w-auto">
-                <button id="btn-batch-checkin" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
+                <button id="btn-batch-checkin"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-layer-group"></i> Batch Check-In
                 </button>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             <!-- Left Column: Search & Quick Barcode Scanner -->
             <div class="space-y-4">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
@@ -58,28 +66,38 @@
                     </h3>
 
                     <div class="relative">
-                        <input type="text" id="return-search-input" placeholder="Scan Tag (e.g. AA-01) or Member Name..." 
+                        <input type="text" id="return-search-input"
+                            placeholder="Scan Tag (e.g. AA-01) or Member Name..."
                             class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
-                        <i class="fa-solid fa-qrcode absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <i
+                            class="fa-solid fa-qrcode absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     </div>
 
-                    <div class="flex items-center justify-between text-xs text-slate-500 font-medium pt-2 border-t border-slate-100">
+                    <div
+                        class="flex items-center justify-between text-xs text-slate-500 font-medium pt-2 border-t border-slate-100">
                         <span>Outstanding Items:</span>
-                        <span id="checked-out-count-badge" class="bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-full text-[11px]">0 Items Out</span>
+                        <span id="checked-out-count-badge"
+                            class="bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-full text-[11px]">0
+                            Items Out</span>
                     </div>
                 </div>
 
                 <!-- Member Quick Summary Widget -->
-                <div id="member-summary-card" class="hidden bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div id="member-summary-card"
+                    class="hidden bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                     <div class="flex justify-between items-start">
                         <div>
-                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Filtered Member</div>
+                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Filtered Member
+                            </div>
                             <h4 id="member-card-name" class="font-extrabold text-slate-900 text-sm">Member Name</h4>
                             <p id="member-card-email" class="text-xs text-slate-500">email@domain.com</p>
                         </div>
-                        <span id="member-card-liability" class="bg-brand-50 text-brand-700 text-xs font-extrabold px-2.5 py-1 rounded-lg border border-brand-100">$0.00 Owed</span>
+                        <span id="member-card-liability"
+                            class="bg-brand-50 text-brand-700 text-xs font-extrabold px-2.5 py-1 rounded-lg border border-brand-100">$0.00
+                            Owed</span>
                     </div>
-                    <button id="btn-clear-member-filter" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 rounded-lg transition">
+                    <button id="btn-clear-member-filter"
+                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 rounded-lg transition">
                         Clear Member Filter
                     </button>
                 </div>
@@ -89,14 +107,16 @@
             <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                     <h3 class="font-bold text-slate-800 text-xs flex items-center gap-2">
-                        <i class="fa-solid fa-clock-rotate-left text-brand-600"></i> Outstanding Issued & Requested Property
+                        <i class="fa-solid fa-clock-rotate-left text-brand-600"></i> Outstanding Issued & Requested
+                        Property
                     </h3>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                            <tr
+                                class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
                                 <th class="p-3">Tag Code</th>
                                 <th class="p-3">Item Title</th>
                                 <th class="p-3">Qty & Size</th>
@@ -114,7 +134,8 @@
     </main>
 
     <!-- ITEM INSPECTION & CHECK-IN MODAL -->
-    <div id="checkin-inspect-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="checkin-inspect-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden text-xs">
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
                 <h3 class="font-bold text-sm">Item Check-In & Inspection</h3>
@@ -130,7 +151,9 @@
                 <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
                     <div class="flex justify-between items-center">
                         <span id="inspect-tag-display" class="font-mono font-bold text-brand-600 text-sm">AA-00</span>
-                        <span id="inspect-vanguard-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">In Unit Inventory</span>
+                        <span id="inspect-vanguard-badge"
+                            class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">In Unit
+                            Inventory</span>
                     </div>
                     <div id="inspect-title-display" class="font-bold text-slate-900 text-xs">Item Title</div>
                     <div id="inspect-member-display" class="text-slate-500 text-[11px]">Issued to: N/A</div>
@@ -139,17 +162,20 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Returning Size</label>
-                        <input type="text" id="inspect-returned-size" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700">
+                        <input type="text" id="inspect-returned-size" readonly
+                            class="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Check-In Quantity *</label>
-                        <input type="number" id="inspect-quantity" min="1" max="99" value="1" required class="w-full p-2 border border-slate-300 rounded-lg font-bold bg-slate-50 focus:bg-white focus:ring-1 focus:ring-brand-500">
+                        <input type="number" id="inspect-quantity" min="1" max="99" value="1" required
+                            class="w-full p-2 border border-slate-300 rounded-lg font-bold bg-slate-50 focus:bg-white focus:ring-1 focus:ring-brand-500">
                     </div>
                 </div>
 
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Returned Item Condition</label>
-                    <select id="inspect-condition" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-medium">
+                    <select id="inspect-condition"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-medium">
                         <option value="GOOD">Good / Ready for Re-issue</option>
                         <option value="LAUNDRY">Needs Cleaning / Laundering</option>
                         <option value="DAMAGED">Damaged (Requires Repair / Replacement)</option>
@@ -158,14 +184,17 @@
 
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Return Notes / Comments</label>
-                    <textarea id="inspect-notes" rows="2" placeholder="e.g. Cleaned, minor wear, ready for shelf..." class="w-full p-2.5 border border-slate-300 rounded-lg text-xs"></textarea>
+                    <textarea id="inspect-notes" rows="2" placeholder="e.g. Cleaned, minor wear, ready for shelf..."
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs"></textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" id="btn-cancel-inspect-modal" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">
+                    <button type="button" id="btn-cancel-inspect-modal"
+                        class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">
                         Cancel
                     </button>
-                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold shadow-sm">
+                    <button type="submit"
+                        class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold shadow-sm">
                         Confirm Check-In
                     </button>
                 </div>
@@ -176,4 +205,5 @@
     <app-footer></app-footer>
     <script type="module" src="/pages/return.js"></script>
 </body>
+
 </html>

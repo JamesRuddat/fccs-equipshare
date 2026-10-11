@@ -74,7 +74,7 @@ function renderReturnList(filterQuery = '') {
         const matchTitle = (item.title || '').toLowerCase().includes(filterQuery);
         const matchCode = (item.locationCode || '').toLowerCase().includes(filterQuery);
         const matchMember = (
-            item.lastIssuedToName || item.lastIssuedToEmail || 
+            item.lastIssuedToName || item.lastIssuedToEmail ||
             item.requestedByName || item.requestedByEmail || ''
         ).toLowerCase().includes(filterQuery);
         return matchTitle || matchCode || matchMember;
@@ -101,7 +101,7 @@ function renderReturnList(filterQuery = '') {
 
         // History / Vanguard status check
         const isVanguardOnly = item.status === 'VANGUARD' || item.isVanguardOnly;
-        const historyBadge = isVanguardOnly 
+        const historyBadge = isVanguardOnly
             ? `<span class="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-800 rounded">Vanguard Only</span>`
             : `<span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded">In Unit Closet</span>`;
 
@@ -164,9 +164,9 @@ function openInspectModal(itemId) {
     document.getElementById('inspect-tag-display').textContent = item.locationCode || 'N/A';
     document.getElementById('inspect-title-display').textContent = item.title || 'Untitled Item';
     document.getElementById('inspect-member-display').textContent = `Issued to: ${memberName} (${memberEmail})`;
-    
+
     document.getElementById('inspect-returned-size').value = sizeOut;
-    
+
     const qtyInput = document.getElementById('inspect-quantity');
     if (qtyInput) {
         qtyInput.value = qtyOut;
@@ -206,6 +206,6 @@ async function handleInspectionSubmit() {
         showToast(`Slot ${locationCode} (${qty}x ${size}) checked back into inventory!`);
     } catch (err) {
         console.error("Failed to check in item:", err);
-        alert("Check-in failed: " + err.message);
+        window.showAlert("Check-in failed", err.message, "error");
     }
 }

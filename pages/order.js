@@ -162,12 +162,12 @@ async function finalizeCheckout() {
     const email = document.getElementById('officer-member-email')?.value?.trim();
 
     if (!name || !email) {
-        alert("Please provide member Full Name and Email.");
+        window.showAlert("Missing fields", "Please provide member Full Name and Email.", "error");
         return;
     }
 
     if (!AppState.cart || AppState.cart.length === 0) {
-        alert("Pick basket is empty. Add items before checking out.");
+        window.showAlert("Cart is empty", "Add items before checking out.", "error");
         return;
     }
 
@@ -201,6 +201,6 @@ async function finalizeCheckout() {
         window.location.href = '/pages/confirmation.html';
     } catch (err) {
         console.error("Checkout error:", err);
-        alert("Failed to complete request: " + err.message);
+        window.showAlert("Failed to complete request", err.message, "error");
     }
 }

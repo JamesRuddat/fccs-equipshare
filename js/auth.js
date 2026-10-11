@@ -1,11 +1,11 @@
 // /js/auth.js
 import { AppState, showToast } from '/js/state.js';
-import { 
-    listenToAuthState, 
-    getUserProfile, 
-    loginUserAccount, 
-    registerUserAccount, 
-    logoutUserAccount 
+import {
+    listenToAuthState,
+    getUserProfile,
+    loginUserAccount,
+    registerUserAccount,
+    logoutUserAccount
 } from '/js/firebase-db.js';
 
 export function initAuth(onUserChanged) {
@@ -32,6 +32,10 @@ export function initAuth(onUserChanged) {
         }
 
         renderUserNavPill();
+        
+        // Notify all web components (like <app-header>) that auth state has loaded/changed
+        window.dispatchEvent(new CustomEvent('user-state-changed'));
+
         if (typeof onUserChanged === 'function') onUserChanged(AppState.currentUser);
     });
 }
@@ -75,7 +79,7 @@ export function closeAuthModal() {
 window.openAuthModal = openAuthModal;
 window.closeAuthModal = closeAuthModal;
 
-window.toggleAuthMode = function(mode) {
+window.toggleAuthMode = function (mode) {
     const loginForm = document.getElementById('login-form');
     const regForm = document.getElementById('register-form');
     const title = document.getElementById('auth-modal-title');
@@ -91,9 +95,9 @@ window.toggleAuthMode = function(mode) {
     }
 };
 
-window.handleUserLogin = async function(e) {
+window.handleUserLogin = async function (e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    
+
     const emailEl = document.getElementById('login-email');
     const passwordEl = document.getElementById('login-password');
 
@@ -101,58 +105,61 @@ window.handleUserLogin = async function(e) {
     const password = passwordEl?.value;
 
     if (!email || !password) {
-        alert("Please enter both email and password.");
+        window.showAlert("Login Failed", "Please enter both email and password.", "error");
         return;
     }
 
     try {
         await loginUserAccount(email, password);
         if (passwordEl) passwordEl.value = '';
-        
+
         if (typeof showToast === 'function') showToast("Signed in successfully!");
         closeAuthModal();
+
+        // Removed undefined `userProfile` reference — listenToAuthState handles state update automatically
     } catch (err) {
         console.error("Authentication Error:", err);
         if (err.code === 'auth/invalid-credential' || err.message?.includes('invalid-credential')) {
-            alert("Invalid login credentials. Please check your email and password, or create an account if you haven't registered yet.");
+            window.showAlert("Invalid login credentials", "Please check your email and password, or create an account if you haven't registered yet.", "error");
         } else {
-            alert("Login failed: " + err.message);
+            window.showAlert("Login failed", err.message, "error");
         }
     }
 };
 
-window.handleUserRegister = async function(e) {
+window.handleUserRegister = async function (e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    
+
     const name = document.getElementById('reg-name')?.value?.trim();
     const phone = document.getElementById('reg-phone')?.value?.trim();
     const email = document.getElementById('reg-email')?.value?.trim();
     const password = document.getElementById('reg-password')?.value;
 
     if (!email || !password || !name) {
-        alert("Please complete all required registration fields.");
+        window.showAlert("Registration failed", "Please complete all required registration fields.", "error");
         return;
     }
 
     try {
         await registerUserAccount(email, password, name, phone);
-        
+
         const passwordEl = document.getElementById('reg-password');
         if (passwordEl) passwordEl.value = '';
-        
+
         if (typeof showToast === 'function') showToast("Account created and linked successfully!");
         closeAuthModal();
     } catch (err) {
         console.error("Registration Error:", err);
-        alert("Registration failed: " + err.message);
+        window.showAlert("Registration failed", err.message, "error");
     }
 };
 
-window.handleUserLogout = async function() {
+window.handleUserLogout = async function () {
     try {
         await logoutUserAccount();
         AppState.currentUser = null;
         renderUserNavPill();
+        window.dispatchEvent(new CustomEvent('user-state-changed'));
         if (typeof showToast === 'function') showToast("Signed out.");
     } catch (err) {
         console.error("Logout failed:", err);

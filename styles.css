@@ -1,23 +1,23 @@
 :root {
-  /* --- Primary Brand Colors --- */
-  --cap-symbol-blue: #001871;
-  --cap-silver-gray: #9ea2a2;
+    /* --- Primary Brand Colors --- */
+    --cap-symbol-blue: #001871;
+    --cap-silver-gray: #9ea2a2;
 
-  /* --- Secondary & Accent Colors --- */
-  --cap-scarlet-red: #ba0c2f;
-  --cap-af-yellow: #ffcd00;
-  --cap-black: #000000;
-  --cap-white: #ffffff;
+    /* --- Secondary & Accent Colors --- */
+    --cap-scarlet-red: #ba0c2f;
+    --cap-af-yellow: #ffcd00;
+    --cap-black: #000000;
+    --cap-white: #ffffff;
 
-  /* --- Supplemental Colors (20% Tint) --- */
-  --cap-symbol-blue-20: #ccd1e3;
-  --cap-scarlet-red-20: #f1ced5;
-  --cap-af-yellow-20: #fff5cc;
-  --cap-silver-gray-20: #ececec;
+    /* --- Supplemental Colors (20% Tint) --- */
+    --cap-symbol-blue-20: #ccd1e3;
+    --cap-scarlet-red-20: #f1ced5;
+    --cap-af-yellow-20: #fff5cc;
+    --cap-silver-gray-20: #ececec;
 
-  /* --- Limited Use Colors --- */
-  --cap-navy: #111728;
-  --cap-sky-blue: #99b9ca;
+    /* --- Limited Use Colors --- */
+    --cap-navy: #111728;
+    --cap-sky-blue: #99b9ca;
 }
 
 /* STREAMING_CHUNK:Styling layout, typography, barcode font, custom scrollbars, and print layouts... */
@@ -137,4 +137,119 @@
 
 .btn-floating-footer {
     @apply fixed bottom-4 left-4 z-40 bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl shadow-lg font-extrabold text-xs flex items-center gap-2 cursor-pointer transition no-print;
+}
+
+:root {
+    --font-heading: 'Rajdhani', sans-serif;
+    --font-body: 'Ubuntu', sans-serif;
+}
+
+:root,
+:root[data-theme="light"] {
+    --primary-color: #001871;
+    --secondary-color: #111728;
+    --alt-color: #ba0c2f;
+    --text-color: #1a1a1a;
+    --light-text-color: #6e6e6e;
+    --alert-color: #ffcd00;
+    --background: #f8fafc;
+    --card-background: #ffffff;
+    --card-shadow: rgba(0, 0, 0, 0.08);
+    --input-bg: #edf2f7;
+    --border-color: #cbd5e1;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0;
+}
+
+/* ==========================================================================
+   3. STICKY HEADER & NAVBAR
+   ========================================================================== */
+site-header,
+app-header {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+#navbar,
+.tactical-navbar {
+    background-color: var(--primary-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1.5rem;
+}
+
+#navbar a {
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 0.5rem 0.85rem;
+    text-decoration: none;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#navbar a:hover,
+#navbar a.active-nav {
+    background-color: var(--alert-color);
+    color: #000000;
+}
+
+/* Tactical Buttons */
+.btn-tactical {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    transition: filter 0.15s ease, transform 0.1s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.btn-tactical:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+}
+
+.btn-gold {
+    background-color: var(--alert-color);
+    color: #000000;
+}
+
+.btn-blue {
+    background-color: var(--primary-color);
+    color: #ffffff;
+}
+
+.btn-red {
+    background-color: var(--alt-color);
+    color: #ffffff;
 }

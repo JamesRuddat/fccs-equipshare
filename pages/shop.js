@@ -3,6 +3,9 @@ import { AppState, saveCart, showToast } from '/js/state.js';
 import { initAuth } from '/js/auth.js';
 import { getSupplyItems } from '/js/firebase-db.js';
 
+// Fallback image asset (Civil Air Patrol Roundel)
+const CAP_FALLBACK_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg/250px-Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg.png';
+
 document.addEventListener('DOMContentLoaded', async () => {
     initAuth();
     setupEventListeners();
@@ -41,7 +44,7 @@ function updateShopStats() {
         if (item.status === 'IN') {
             inVal += val;
             inCount++;
-        } else if (item.status === 'OUT') {
+        } else if (item.status === 'OUT' || item.status === 'REQUESTED' || item.status === 'ISSUED') {
             outVal += val;
             outCount++;
         }
@@ -119,6 +122,12 @@ function setupEventListeners() {
     if (btnClearCart) btnClearCart.addEventListener('click', clearCurrentCart);
     if (btnProceed) btnProceed.addEventListener('click', proceedToPickList);
     if (btnCartToggle) btnCartToggle.addEventListener('click', toggleCartDrawer);
+
+    // Listen for cart changes globally to update button states dynamically
+    window.addEventListener('cart-updated', () => {
+        renderShopItems();
+        updateCartBadge();
+    });
 }
 
 export function renderShopItems() {
@@ -161,11 +170,14 @@ export function renderShopItems() {
 
         const thumbSrc = item.image && item.image.trim() !== "" 
             ? item.image 
-            : `/images/products/${item.locationCode}.jpg`;
+            : CAP_FALLBACK_IMAGE;
 
         const categoryLabel = Array.isArray(item.categories) && item.categories.length > 0 
             ? item.categories.join(', ') 
             : (item.category || 'General');
+
+        // Check if item is already added to cart
+        const isInCart = (AppState.cart || []).some(c => c.locationCode === item.locationCode);
 
         // Stock map & size options
         const stockMap = item.stock || { "OS": 1 };
@@ -174,26 +186,43 @@ export function renderShopItems() {
         // Size Dropdown
         const sizeDropdownHtml = stockEntries.length > 0 ? `
             <div class="mt-2">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Available Sizes</label>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Available Items</label>
                 <select class="card-size-select w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500">
                     ${stockEntries.map(([sz, qty]) => {
                         const count = parseInt(qty, 10) || 0;
-                        const label = sz === 'OS' ? 'One Size' : `Size: ${sz}`;
+                        const label = sz === 'OS' ? 'Single Size' : `Size: ${sz}`;
                         return `<option value="${sz}" ${count <= 0 ? 'disabled' : ''}>${label} (${count > 0 ? count + ' left' : 'Out of stock'})</option>`;
                     }).join('')}
                 </select>
             </div>
         ` : '';
 
+        // Price Display:
+        // In Stock -> Retail strikethrough, $0.00 Unit price, FREE badge
+        // Out of Stock -> Full retail price, no FREE badge
+        const priceDisplayHtml = isAvailable ? `
+            <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs text-slate-400 line-through font-semibold">$${rawPrice.toFixed(2)}</span>
+                <span class="text-base font-extrabold text-brand-600">$0.00</span>
+                <span class="bg-brand-100 text-brand-800 text-[10px] font-bold px-1.5 py-0.5 rounded">FREE (If Returned)</span>
+            </div>
+        ` : `
+            <div class="flex items-center gap-2 mt-1">
+                <span class="text-base font-extrabold text-slate-900">$${rawPrice.toFixed(2)}</span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase">(Retail Price)</span>
+            </div>
+        `;
+
         return `
             <div data-item-code="${item.locationCode}" class="item-card bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group">
                 <div>
-                    <div class="relative h-44 bg-slate-100 overflow-hidden">
-                        <img src="${thumbSrc}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=600';" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                        <span class="absolute top-2 left-2 font-mono text-xs font-extrabold bg-slate-900/90 text-white px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm">
+                    <!-- Updated image container with object-contain and padding to prevent cut-off -->
+                    <div class="relative p-1 flex items-center justify-center border-b border-slate-100 overflow-hidden">
+                        <img src="${thumbSrc}" onerror="this.onerror=null; this.src='${CAP_FALLBACK_IMAGE}';" alt="${item.title}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300">
+                        <span class="absolute top-2 left-2 font-mono text-xs font-extrabold bg-slate-900/90 text-white px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm z-10">
                             ${item.locationCode}
                         </span>
-                        <span class="absolute top-2 right-2 text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                        <span class="absolute top-2 right-2 text-[10px] font-bold uppercase px-2 py-1 rounded-full z-10 ${
                             isAvailable ? 'bg-brand-500 text-slate-950' : 'bg-amber-500 text-slate-950'
                         }">
                             ${isAvailable ? 'In supply' : 'Out'}
@@ -205,24 +234,23 @@ export function renderShopItems() {
                         <h3 class="font-bold text-sm text-slate-900 leading-snug line-clamp-2 group-hover:text-brand-600 transition">${item.title}</h3>
                         <div class="text-xs font-semibold text-slate-500"><i class="fa-solid fa-location-dot text-brand-600 mr-1"></i>${item.location || 'Storage Slot'}</div>
                         
-                        <div class="flex items-center gap-2 mt-1">
-                            <span class="text-xs text-slate-400 line-through font-semibold">$${rawPrice.toFixed(2)}</span>
-                            <span class="text-base font-extrabold text-brand-600">$0.00</span>
-                            <span class="bg-brand-100 text-brand-800 text-[10px] font-bold px-1.5 py-0.5 rounded">FREE (If Returned)</span>
-                        </div>
-
+                        ${priceDisplayHtml}
                         ${isAvailable ? sizeDropdownHtml : ''}
                     </div>
                 </div>
 
-                <div class="p-4 pt-0 space-y-2">
+                <div class="p-3 pt-0 space-y-2">
                     ${isAvailable ? `
                         <div class="flex items-center gap-2">
                             <div class="w-20">
                                 <input type="number" min="1" max="99" value="1" class="card-qty-input w-full p-2 border border-slate-300 rounded-xl text-center font-bold text-xs bg-slate-50 focus:outline-none focus:ring-1 focus:ring-brand-500" title="Quantity">
                             </div>
-                            <button data-action="add-to-cart" data-location-code="${item.locationCode}" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-plus"></i> Add to Cart
+                            <button data-action="add-to-cart" data-location-code="${item.locationCode}" class="flex-1 font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 ${
+                                isInCart 
+                                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+                                    : 'bg-brand-600 hover:bg-brand-700 text-white'
+                            }">
+                                <i class="fa-solid ${isInCart ? 'fa-check' : 'fa-plus'}"></i> ${isInCart ? 'Added to Cart' : 'Add to Cart'}
                             </button>
                         </div>
                     ` : `
@@ -248,7 +276,6 @@ function addToCartWithDetails(locationCode, size, quantity) {
     const item = AppState.supply.find(i => i.locationCode === locationCode);
     if (!item) return;
 
-    // Check if item with exact same size is already in cart
     const existingIndex = AppState.cart.findIndex(c => c.locationCode === locationCode && c.selectedSize === size);
 
     if (existingIndex >= 0) {
@@ -262,9 +289,8 @@ function addToCartWithDetails(locationCode, size, quantity) {
     }
 
     saveCart();
-    renderCartDrawer();
-    updateCartBadge();
-    showToast(`Added ${quantity}x ${item.title} (${size}) to pick basket!`);
+    window.dispatchEvent(new CustomEvent('cart-updated'));
+    showToast(`Added ${quantity}x ${item.title} (${size}) to cart!`);
 }
 
 function removeCartItemByIndex(index) {
@@ -272,8 +298,7 @@ function removeCartItemByIndex(index) {
 
     const removedItem = AppState.cart.splice(index, 1)[0];
     saveCart();
-    renderCartDrawer();
-    updateCartBadge();
+    window.dispatchEvent(new CustomEvent('cart-updated'));
 
     if (removedItem) {
         showToast(`Removed ${removedItem.title} from basket.`);
@@ -290,8 +315,7 @@ function adjustCartQuantity(index, delta) {
     } else {
         AppState.cart[index].quantity = newQty;
         saveCart();
-        renderCartDrawer();
-        updateCartBadge();
+        window.dispatchEvent(new CustomEvent('cart-updated'));
     }
 }
 
@@ -313,7 +337,7 @@ function renderCartDrawer() {
     if (!container) return;
 
     if (!AppState.cart || AppState.cart.length === 0) {
-        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">Your pick basket is currently empty.</p>`;
+        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">Your cart is currently empty.</p>`;
         return;
     }
 
@@ -341,7 +365,7 @@ function renderCartDrawer() {
                     <button data-action="adjust-cart-qty" data-cart-index="${index}" data-delta="1" class="px-2 py-1 text-slate-600 hover:bg-slate-200 text-xs font-bold transition">+</button>
                 </div>
 
-                <!-- Working Delete Button -->
+                <!-- Delete Button -->
                 <button data-action="remove-cart-item" data-cart-index="${index}" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition" title="Remove item">
                     <i class="fa-solid fa-trash-can text-sm"></i>
                 </button>
@@ -353,10 +377,8 @@ function renderCartDrawer() {
 function clearCurrentCart() {
     AppState.cart = [];
     saveCart();
-    renderShopItems();
-    renderCartDrawer();
-    updateCartBadge();
-    showToast("Pick basket cleared.");
+    window.dispatchEvent(new CustomEvent('cart-updated'));
+    showToast("Cart cleared.");
 }
 
 function proceedToPickList() {
