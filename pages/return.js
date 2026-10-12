@@ -64,7 +64,7 @@ function renderReturnList(filterQuery = '') {
     const badge = document.getElementById('checked-out-count-badge');
 
     // Filter items with ISSUED or REQUESTED status
-    const outstandingItems = (AppState.supply || []).filter(i => i.status === 'ISSUED' || i.status === 'REQUESTED' || i.status === 'OUT');
+    const outstandingItems = (AppState.supply || []).filter(i => i.status === 'ISSUED');
     if (badge) badge.textContent = `${outstandingItems.length} Outstanding`;
 
     if (!container) return;

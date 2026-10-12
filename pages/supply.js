@@ -1,30 +1,30 @@
-// /js/admin.js - Unified Administration, Directory, Supply Console & Pending Orders Manager
+// /js/supply.js - Supply Inventory Master Console & Bulk Import Manager
 import { AppState, showToast } from '/js/state.js';
 import { initAuth } from '/js/auth.js';
 import { 
     getSupplyItems, 
     createSupplyItem, 
     updateSupplyItem, 
-    issueSupplyItem,
-    getAllUsers, 
-    updateUserRoleInDB 
+    issueSupplyItem 
 } from '/js/firebase-db.js';
 
 // Fallback image asset
-const CAP_FALLBACK_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg/250px-Roundel_of_the_United_States_%281941%29_%E2%80%93_Civil_Air_Patrol.svg.png';
+const CAP_FALLBACK_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Roundel_of_United_States_Civil_Air_Patrol.svg/250px-Roundel_of_United_States_Civil_Air_Patrol.svg.png';
+
+// Preset default categories
+const DEFAULT_CATEGORIES = ["ABU", "OCP", "Blues", "Insignia", "Outerwear", "Headwear", "Boots", "Equipment", "General"];
 
 document.addEventListener('DOMContentLoaded', () => {
     initAuth(async (user) => {
         AppState.currentUser = user;
-        await refreshAllData();
+        await refreshSupplyData();
     });
 
-    setupTabNavigation();
     setupAdminFilters();
-    setupMemberModalHandlers();
     setupImageUploadListeners();
+    setupInlineCategoryEditor();
 
-    refreshAllData();
+    refreshSupplyData();
 });
 
 /* --- DATA NORMALIZATION & VALIDATION --- */
@@ -42,46 +42,165 @@ function isValidLocationCode(code) {
 }
 
 /* --- STATE SYNCHRONIZATION --- */
-async function refreshAllData() {
+async function refreshSupplyData() {
     try {
-        const [supply, users] = await Promise.all([
-            getSupplyItems().catch(() => []),
-            getAllUsers().catch(() => [])
-        ]);
-
+        const supply = await getSupplyItems().catch(() => []);
         AppState.supply = supply || [];
-        AppState.membersList = users || [];
 
         renderPendingOrdersQueue();
         renderAdminTable();
-        renderMembersGrid();
-        renderUserRolesTable(AppState.membersList);
+        renderCategoryCheckboxes(getSelectedCategoriesFromForm());
     } catch (err) {
-        console.error("Error refreshing admin data:", err);
+        console.error("Error refreshing supply data:", err);
     }
 }
 
-/* --- TAB SWITCHING LOGIC --- */
-function setupTabNavigation() {
-    const tabs = [
-        { btn: document.getElementById('tab-btn-supply'), content: document.getElementById('tab-content-supply') },
-        { btn: document.getElementById('tab-btn-members'), content: document.getElementById('tab-content-members') },
-        { btn: document.getElementById('tab-btn-roles'), content: document.getElementById('tab-content-roles') }
-    ];
+/* --- CATEGORY MULTI-SELECT & INLINE EDITOR LOGIC --- */
+function getAllAvailableCategories() {
+    const existingCategories = new Set(DEFAULT_CATEGORIES);
+    
+    (AppState.supply || []).forEach(item => {
+        const cats = Array.isArray(item.categories) ? item.categories : [item.categories || item.category].filter(Boolean);
+        cats.forEach(c => existingCategories.add(c));
+    });
 
-    tabs.forEach(({ btn, content }) => {
-        if (!btn || !content) return;
-        btn.addEventListener('click', () => {
-            tabs.forEach(t => {
-                t.btn?.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
-                t.btn?.classList.add('text-slate-600');
-                t.content?.classList.add('hidden');
-            });
-            btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
-            btn.classList.remove('text-slate-600');
-            content.classList.remove('hidden');
+    return Array.from(existingCategories);
+}
+
+function renderCategoryCheckboxes(selectedCategories = []) {
+    const container = document.getElementById('category-checkboxes-container');
+    if (!container) return;
+
+    const allCategories = getAllAvailableCategories();
+    const selectedArray = Array.isArray(selectedCategories) 
+        ? selectedCategories 
+        : String(selectedCategories || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    container.innerHTML = allCategories.map(cat => {
+        const isChecked = selectedArray.includes(cat);
+        return `
+            <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
+                <input type="checkbox" name="form-category-checkbox" value="${cat}" ${isChecked ? 'checked' : ''} class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                <span>${cat}</span>
+            </label>
+        `;
+    }).join('');
+}
+
+function getSelectedCategoriesFromForm() {
+    const checkboxes = document.querySelectorAll('input[name="form-category-checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function setupInlineCategoryEditor() {
+    const btnToggle = document.getElementById('btn-toggle-cat-edit');
+    const labelToggle = document.getElementById('label-cat-edit-toggle');
+    const checkboxContainer = document.getElementById('category-checkboxes-container');
+    const inlineEditor = document.getElementById('category-inline-editor');
+
+    if (!btnToggle) return;
+
+    btnToggle.addEventListener('click', () => {
+        const isEditing = !inlineEditor?.classList.contains('hidden');
+
+        if (isEditing) {
+            // Switch back to Checkbox View
+            inlineEditor?.classList.add('hidden');
+            checkboxContainer?.classList.remove('hidden');
+            if (labelToggle) labelToggle.textContent = 'Edit Category Names';
+        } else {
+            // Render and Switch to Inline Rename View
+            renderInlineCategoryRows();
+            checkboxContainer?.classList.add('hidden');
+            inlineEditor?.classList.remove('hidden');
+            if (labelToggle) labelToggle.textContent = 'Done Editing';
+        }
+    });
+}
+
+function renderInlineCategoryRows() {
+    const container = document.getElementById('category-inline-editor');
+    if (!container) return;
+
+    const allCategories = getAllAvailableCategories();
+
+    container.innerHTML = allCategories.map(cat => `
+        <div class="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
+            <input type="text" data-original="${cat}" value="${cat}" class="inline-cat-input flex-1 p-1 border border-slate-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <button type="button" data-action="save-inline-rename" data-original="${cat}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded text-[11px] font-bold transition">
+                Save
+            </button>
+            <button type="button" data-action="delete-inline-cat" data-original="${cat}" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition" title="Delete">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </div>
+    `).join('');
+
+    // Attach row events
+    container.querySelectorAll('[data-action="save-inline-rename"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const oldName = btn.dataset.original;
+            const row = btn.closest('div');
+            const newName = row?.querySelector('.inline-cat-input')?.value.trim();
+
+            if (!newName || newName === oldName) return;
+
+            await renameCategoryGlobally(oldName, newName);
         });
     });
+
+    container.querySelectorAll('[data-action="delete-inline-cat"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const catName = btn.dataset.original;
+            if (confirm(`Remove "${catName}" from all items?`)) {
+                await deleteCategoryGlobally(catName);
+            }
+        });
+    });
+}
+
+async function renameCategoryGlobally(oldName, newName) {
+    let count = 0;
+
+    for (const item of AppState.supply || []) {
+        const cats = Array.isArray(item.categories) ? item.categories : [item.categories || item.category].filter(Boolean);
+        
+        if (cats.includes(oldName)) {
+            const updated = Array.from(new Set(cats.map(c => c === oldName ? newName : c)));
+            try {
+                await updateSupplyItem(item.id, { categories: updated });
+                count++;
+            } catch (err) {
+                console.error(`Failed updating category for item ${item.id}:`, err);
+            }
+        }
+    }
+
+    await refreshSupplyData();
+    renderInlineCategoryRows();
+    showToast(`Renamed "${oldName}" to "${newName}" across ${count} items!`);
+}
+
+async function deleteCategoryGlobally(catName) {
+    let count = 0;
+
+    for (const item of AppState.supply || []) {
+        const cats = Array.isArray(item.categories) ? item.categories : [item.categories || item.category].filter(Boolean);
+
+        if (cats.includes(catName)) {
+            const updated = cats.filter(c => c !== catName);
+            try {
+                await updateSupplyItem(item.id, { categories: updated.length > 0 ? updated : ["General"] });
+                count++;
+            } catch (err) {
+                console.error(`Failed removing category for item ${item.id}:`, err);
+            }
+        }
+    }
+
+    await refreshSupplyData();
+    renderInlineCategoryRows();
+    showToast(`Removed "${catName}" from ${count} items.`);
 }
 
 /* --- FILTER & EVENT DELEGATION SETUP --- */
@@ -106,6 +225,24 @@ function setupAdminFilters() {
         });
     }
 
+    const btnAddCat = document.getElementById('btn-add-new-category');
+    if (btnAddCat) {
+        btnAddCat.addEventListener('click', () => {
+            const input = document.getElementById('input-new-category');
+            const newCatName = input?.value.trim();
+            if (!newCatName) return;
+
+            const currentSelected = getSelectedCategoriesFromForm();
+            if (!currentSelected.includes(newCatName)) {
+                currentSelected.push(newCatName);
+            }
+
+            renderCategoryCheckboxes(currentSelected);
+            if (input) input.value = '';
+            showToast(`Added category: ${newCatName}`);
+        });
+    }
+
     const itemForm = document.getElementById('item-form');
     if (itemForm) {
         itemForm.addEventListener('submit', async (e) => {
@@ -117,29 +254,40 @@ function setupAdminFilters() {
     document.getElementById('btn-close-item-modal')?.addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-item-modal')?.addEventListener('click', closeItemModal);
 
-    // Event delegation for Supply Table
+    // Delegation targeting item.id
     document.getElementById('admin-table-body')?.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('[data-action="edit-item"]');
         const adjustStockBtn = e.target.closest('[data-action="adjust-stock"]');
+        const toggleVisBtn = e.target.closest('[data-action="toggle-visibility"]');
 
         if (editBtn) {
-            openItemModal(editBtn.dataset.docId || editBtn.dataset.locationCode);
+            openItemModal(editBtn.dataset.docId);
         } else if (adjustStockBtn) {
             const docId = adjustStockBtn.dataset.docId;
             const sizeKey = adjustStockBtn.dataset.sizeKey || "OS";
             const delta = parseInt(adjustStockBtn.dataset.delta, 10) || 0;
             await quickAdjustItemStock(docId, sizeKey, delta);
+        } else if (toggleVisBtn) {
+            const docId = toggleVisBtn.dataset.docId;
+            const isCurrentlyHidden = toggleVisBtn.dataset.currentHidden === 'true';
+            try {
+                await updateSupplyItem(docId, { hideFromCatalog: !isCurrentlyHidden });
+                await refreshSupplyData();
+                showToast(isCurrentlyHidden ? "Item is now available in the catalog." : "Item unavailable from catalog.");
+            } catch (err) {
+                console.error("Failed to toggle visibility:", err);
+                if (window.showAlert) window.showAlert("Visibility Toggle Failed", err.message, "error");
+            }
         }
     });
 
-    // Event delegation for Pending Member Orders Queue
     document.getElementById('pending-orders-table-body')?.addEventListener('click', async (e) => {
         const confirmBtn = e.target.closest('[data-action="confirm-issue"]');
         if (confirmBtn) {
             const docId = confirmBtn.dataset.docId;
             try {
                 await issueSupplyItem(docId);
-                await refreshAllData();
+                await refreshSupplyData();
                 showToast("Item marked as ISSUED and handed out!");
             } catch (err) {
                 if (window.showAlert) {
@@ -149,31 +297,11 @@ function setupAdminFilters() {
         }
     });
 
-    // Event delegation for User Roles Table
-    document.getElementById('user-roles-list')?.addEventListener('change', async (e) => {
-        const selectEl = e.target.closest('[data-action="update-user-role"]');
-        if (selectEl) {
-            const uid = selectEl.dataset.uid;
-            const newRole = selectEl.value;
-            try {
-                await updateUserRoleInDB(uid, newRole);
-                showToast("User role updated successfully!");
-                await refreshAllData();
-            } catch (err) {
-                if (window.showAlert) {
-                    window.showAlert("Failed to update role", err.message, "error");
-                }
-            }
-        }
-    });
-
-    // Bulk Import Modal Handlers
     const bulkModal = document.getElementById('bulk-import-modal');
     const btnOpenBulk = document.getElementById('btn-open-bulk-import');
     const btnCloseBulk = document.getElementById('btn-close-bulk-modal');
     const btnCancelBulk = document.getElementById('btn-cancel-bulk-modal');
     const btnRunBulk = document.getElementById('btn-run-bulk-import');
-    const btnSampleData = document.getElementById('btn-load-sample-data');
 
     if (btnOpenBulk) btnOpenBulk.addEventListener('click', () => bulkModal?.classList.remove('hidden'));
     if (btnCloseBulk) btnCloseBulk.addEventListener('click', () => bulkModal?.classList.add('hidden'));
@@ -200,7 +328,7 @@ function setupAdminFilters() {
 
                 bulkModal?.classList.add('hidden');
                 document.getElementById('bulk-import-textarea').value = '';
-                await refreshAllData();
+                await refreshSupplyData();
             } catch (err) {
                 console.error("Bulk import parsing failed:", err);
                 if (window.showAlert) window.showAlert("Import failed", err.message, "error");
@@ -290,7 +418,7 @@ async function quickAdjustItemStock(itemId, sizeKey, delta) {
 
     try {
         await updateSupplyItem(itemId, { stock: stockMap });
-        await refreshAllData();
+        await refreshSupplyData();
         showToast(`Updated ${item.title} (${sizeKey}: ${newQty})`);
     } catch (err) {
         console.error("Stock adjustment failed:", err);
@@ -320,9 +448,10 @@ function renderAdminTable() {
     }
 
     bodyContainer.innerHTML = filtered.map(item => {
-        const stockMap = item.stock || { "OS": 1 };
+        const stockMap = item.stock || { "OS": 0 };
         const totalQty = Object.values(stockMap).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
         const thumbSrc = item.image && item.image.trim() !== "" ? item.image : `/images/products/${item.locationCode || 'placeholder'}.jpg`;
+        const isHidden = item.hideFromCatalog === true || item.hideFromCatalog === 'true';
 
         const inlineStockControls = Object.entries(stockMap).map(([sz, qty]) => `
             <div class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-mono mr-1 mb-1">
@@ -335,7 +464,7 @@ function renderAdminTable() {
 
         let statusBadge = '';
         if (item.status === 'IN') {
-            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800">In Stock</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800">Stock</span>`;
         } else if (item.status === 'REQUESTED') {
             statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">Requested</span>`;
         } else if (item.status === 'ISSUED') {
@@ -343,26 +472,38 @@ function renderAdminTable() {
         } else if (item.status === 'VANGUARD') {
             statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">Vanguard</span>`;
         } else {
-            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Out of Stock</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Out</span>`;
         }
 
+        const visibilityBadge = isHidden 
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 inline-flex items-center gap-1"></i>Unavailable</span>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Available</span>`;
+
+        const categoryText = Array.isArray(item.categories) ? item.categories.join(', ') : (item.categories || item.category || 'General');
+
         return `
-            <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition ${isHidden ? 'bg-slate-50/60' : ''}">
                 <td class="p-2 w-12">
                     <img src="${thumbSrc}" onerror="this.onerror=null; this.src='${CAP_FALLBACK_IMAGE}';" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-sm">
                 </td>
                 <td class="p-3 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
                 <td class="p-3 text-slate-600">${item.location || 'Closet Slot'}</td>
-                <td class="p-3 font-semibold text-slate-900">${item.title || 'Untitled Item'}</td>
+                <td class="p-3 font-semibold text-slate-900">
+                    <div>${item.title || 'Untitled Item'}</div>
+                    <div class="mt-1">${visibilityBadge}</div>
+                </td>
                 <td class="p-3 font-mono font-bold text-slate-900">$${(parseFloat(item.price) || 0).toFixed(2)}</td>
-                <td class="p-3 text-slate-500">${Array.isArray(item.categories) ? item.categories.join(', ') : 'General'}</td>
+                <td class="p-3 text-slate-500">${categoryText}</td>
                 <td class="p-3 font-mono text-[11px] min-w-[200px]">${inlineStockControls} <div class="text-[10px] text-slate-400 font-sans mt-0.5">Total: <strong class="text-brand-600">${totalQty}</strong></div></td>
                 <td class="p-3">${statusBadge}</td>
                 <td class="p-3">
                     ${item.vanguardUrl ? `<a href="${item.vanguardUrl}" target="_blank" class="text-amber-600 font-bold hover:underline">Vanguard</a>` : '<span class="text-slate-400">N/A</span>'}
                 </td>
-                <td class="p-3 text-right">
-                    <button data-action="edit-item" data-doc-id="${item.id}" data-location-code="${item.locationCode}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-xs transition">
+                <td class="p-3 text-right space-x-1">
+                    <button data-action="toggle-visibility" data-doc-id="${item.id}" data-current-hidden="${isHidden}" title="${isHidden ? 'Hiden from being issued' : 'Can be issued'}" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 text-slate-600 transition">
+                        <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                    </button>
+                    <button data-action="edit-item" data-doc-id="${item.id}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-xs transition">
                         <i class="fa-solid fa-pen-to-square mr-1"></i>Edit
                     </button>
                 </td>
@@ -372,30 +513,40 @@ function renderAdminTable() {
 }
 
 /* --- MODAL CONTROLS & PARSING --- */
-export function openItemModal(targetIdOrCode = null) {
+export function openItemModal(targetDocId = null) {
     const modal = document.getElementById('item-modal');
     if (!modal) return;
 
-    const item = (AppState.supply || []).find(i => i.id === targetIdOrCode || String(i.locationCode).toUpperCase() === String(targetIdOrCode).toUpperCase());
-    const imgPreview = document.getElementById('modal-image-preview');
+    // Reset inline editor view
+    document.getElementById('category-inline-editor')?.classList.add('hidden');
+    document.getElementById('category-checkboxes-container')?.classList.remove('hidden');
+    const labelToggle = document.getElementById('label-cat-edit-toggle');
+    if (labelToggle) labelToggle.textContent = 'Edit Category Names';
 
-    if (targetIdOrCode && item) {
+    const item = (AppState.supply || []).find(i => i.id === targetDocId);
+    const imgPreview = document.getElementById('modal-image-preview');
+    const hideCheckbox = document.getElementById('form-hide-from-catalog');
+
+    if (targetDocId && item) {
         document.getElementById('modal-title').textContent = 'Edit Supply Item';
         document.getElementById('form-doc-id').value = item.id;
         document.getElementById('form-location-code').value = item.locationCode || '';
         document.getElementById('form-location').value = item.location || '';
         document.getElementById('form-title').value = item.title || '';
         document.getElementById('form-price').value = item.price || '';
-        document.getElementById('form-categories').value = Array.isArray(item.categories) ? item.categories.join(', ') : '';
 
-        const stockMap = item.stock || { "OS": 1 };
+        renderCategoryCheckboxes(item.categories || [item.category].filter(Boolean));
+
+        const stockMap = item.stock || { "OS": 0 };
         if (item.isOneSize || (Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS")) {
-            document.getElementById('form-sizes').value = stockMap["OS"] ?? 1;
+            document.getElementById('form-sizes').value = stockMap["OS"] ?? 0;
         } else {
             document.getElementById('form-sizes').value = Object.entries(stockMap)
                 .map(([sz, qty]) => `${sz}: ${qty}`)
                 .join(', ');
         }
+
+        if (hideCheckbox) hideCheckbox.checked = item.hideFromCatalog === true || item.hideFromCatalog === 'true';
 
         const imageVal = item.image || `/images/products/${item.locationCode}.jpg`;
         document.getElementById('form-image-path').value = imageVal;
@@ -409,6 +560,8 @@ export function openItemModal(targetIdOrCode = null) {
         document.getElementById('modal-title').textContent = 'Add New Supply Item';
         document.getElementById('form-doc-id').value = '';
         document.getElementById('item-form').reset();
+        renderCategoryCheckboxes([]);
+        if (hideCheckbox) hideCheckbox.checked = false;
         if (imgPreview) imgPreview.classList.add('hidden');
     }
 
@@ -420,7 +573,7 @@ export function closeItemModal() {
 }
 
 function parseStockFromInput(inputStr) {
-    if (!inputStr || !inputStr.trim()) return { "OS": 1 };
+    if (!inputStr || !inputStr.trim()) return { "OS": 0 };
 
     const str = inputStr.trim();
 
@@ -436,14 +589,14 @@ function parseStockFromInput(inputStr) {
             const [size, qty] = part.split(':');
             const cleanSize = size.trim().toUpperCase();
             const cleanQty = parseInt(qty, 10);
-            if (cleanSize) stockMap[cleanSize] = !isNaN(cleanQty) && cleanQty >= 0 ? cleanQty : 1;
+            if (cleanSize) stockMap[cleanSize] = !isNaN(cleanQty) && cleanQty >= 0 ? cleanQty : 0;
         } else {
             const cleanSize = part.trim().toUpperCase();
-            if (cleanSize) stockMap[cleanSize] = 1;
+            if (cleanSize) stockMap[cleanSize] = 0;
         }
     });
 
-    return Object.keys(stockMap).length > 0 ? stockMap : { "OS": 1 };
+    return Object.keys(stockMap).length > 0 ? stockMap : { "OS": 0 };
 }
 
 async function handleItemFormSubmit() {
@@ -460,14 +613,18 @@ async function handleItemFormSubmit() {
 
     const stockInputRaw = document.getElementById('form-sizes').value;
     const stockMap = parseStockFromInput(stockInputRaw);
+    const hideCheckbox = document.getElementById('form-hide-from-catalog');
+    const selectedCategories = getSelectedCategoriesFromForm();
 
     const itemData = {
         locationCode: formattedTag,
         location: document.getElementById('form-location').value,
         title: document.getElementById('form-title').value,
         price: parseFloat(document.getElementById('form-price').value) || 0,
-        categories: document.getElementById('form-categories').value,
+        categories: selectedCategories.length > 0 ? selectedCategories : ["General"],
         stock: stockMap,
+        status: 'IN',
+        hideFromCatalog: hideCheckbox ? hideCheckbox.checked : false,
         image: document.getElementById('form-image-path').value || `/images/products/${formattedTag}.jpg`,
         vanguardUrl: document.getElementById('form-vanguard-url').value
     };
@@ -478,251 +635,11 @@ async function handleItemFormSubmit() {
         } else {
             await createSupplyItem(itemData);
         }
-        await refreshAllData();
+        await refreshSupplyData();
         closeItemModal();
     } catch (err) {
         if (window.showAlert) window.showAlert("Failed to save item", err.message, "error");
     }
-}
-
-/* --- MEMBER DIRECTORY & RESPONSIBILITY LOGIC --- */
-export function renderMembersGrid() {
-    const container = document.getElementById('members-grid');
-    if (!container) return;
-
-    const members = AppState.membersList || [];
-
-    if (members.length === 0) {
-        container.innerHTML = `
-            <div class="col-span-full text-center py-12 bg-white rounded-2xl border border-slate-200">
-                <i class="fa-solid fa-users text-4xl text-slate-300 mb-2"></i>
-                <p class="text-sm font-semibold text-slate-600">No members found in directory.</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = members.map(member => {
-        const memberEmail = (member.email || '').toLowerCase().trim();
-        const memberName = member.fullName || '';
-        const memberUid = member.uid || member.id;
-
-        const issuedItems = (AppState.supply || []).filter(item => 
-            item.status === 'ISSUED' && (
-                (memberUid && item.lastIssuedToUid === memberUid) ||
-                (memberEmail && item.lastIssuedToEmail === memberEmail) ||
-                (memberName && item.lastIssuedToName === memberName)
-            )
-        );
-
-        const requestedItems = (AppState.supply || []).filter(item => 
-            item.status === 'REQUESTED' && (
-                (memberUid && item.requestedByUid === memberUid) ||
-                (memberEmail && item.requestedByEmail === memberEmail) ||
-                (memberName && item.requestedByName === memberName)
-            )
-        );
-
-        const totalValueOwed = issuedItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
-
-        const issuedItemsHtml = issuedItems.length > 0 ? issuedItems.map(item => `
-            <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100">
-                <div class="truncate pr-2">
-                    <span class="font-mono font-bold text-slate-900 mr-1">[${item.locationCode || 'N/A'}]</span>
-                    <span class="text-slate-700 font-medium">${item.title}</span>
-                </div>
-                <span class="font-mono text-slate-500 font-semibold">$${(parseFloat(item.price) || 0).toFixed(2)}</span>
-            </div>
-        `).join('') : `<p class="text-[11px] text-slate-400 italic py-1">No property currently on issue.</p>`;
-
-        const requestedItemsHtml = requestedItems.length > 0 ? requestedItems.map(item => `
-            <div class="flex items-center justify-between text-xs py-1 border-b border-amber-100/60 bg-amber-50/50 px-2 rounded">
-                <div class="truncate pr-2">
-                    <span class="font-mono font-bold text-amber-800 mr-1">[${item.locationCode || 'N/A'}]</span>
-                    <span class="text-amber-900 font-medium">${item.title}</span>
-                </div>
-                <span class="text-[10px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Pending</span>
-            </div>
-        `).join('') : '';
-
-        return `
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition p-5 flex flex-col justify-between space-y-4">
-                <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 font-extrabold flex items-center justify-center text-sm shadow-inner">
-                            ${(memberName || 'M').charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-slate-900 text-sm leading-tight">${memberName || 'Unnamed Member'}</h3>
-                            <span class="inline-block text-[10px] font-bold uppercase tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md mt-0.5">
-                                ${(member.role || 'member').replace(/_/g, ' ')}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="text-xs space-y-1 text-slate-500 pt-1 border-t border-slate-100">
-                        <div><i class="fa-regular fa-envelope mr-1.5 text-slate-400"></i>${member.email || 'N/A'}</div>
-                        <div><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i>${member.phone || 'N/A'}</div>
-                    </div>
-
-                    ${requestedItems.length > 0 ? `
-                        <div class="space-y-1 pt-2">
-                            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
-                                <i class="fa-solid fa-clock"></i> Pending Pickup Orders (${requestedItems.length})
-                            </div>
-                            <div class="space-y-1">
-                                ${requestedItemsHtml}
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    <div class="space-y-1 pt-2">
-                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                            <i class="fa-solid fa-boxes-packing text-brand-600"></i> Issued Equipment (${issuedItems.length})
-                        </div>
-                        <div class="max-h-36 overflow-y-auto divide-y divide-slate-100 pr-1">
-                            ${issuedItemsHtml}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between mt-2">
-                    <div>
-                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Property On Loan</div>
-                        <div class="text-xs font-extrabold text-slate-800">${issuedItems.length} Items</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Replacement Liability</div>
-                        <div class="text-sm font-extrabold ${totalValueOwed > 0 ? 'text-amber-600' : 'text-slate-600'}">
-                            $${totalValueOwed.toFixed(2)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-/**
- * Creates the DOM element for the New Member Registration Modal if it doesn't already exist.
- */
-function createMemberModalElement() {
-    const modal = document.createElement('div');
-    modal.id = 'new-member-modal';
-    modal.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print';
-    modal.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="font-extrabold text-slate-900 text-base">Add Temporary Member to Directory</h3>
-                <button id="btn-close-member-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-            
-            <form id="add-member-form" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
-                    <input type="text" id="member-full-name" required placeholder="e.g. John Doe" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-                    <input type="email" id="member-email" required placeholder="cadet@wi055.cap.gov" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
-                    <input type="tel" id="member-phone" placeholder="(920) 555-0199" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Assigned Role</label>
-                    <select id="member-role" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                        <option value="member">Cadet / Member</option>
-                        <option value="cadet_supply_officer">Cadet Supply Officer</option>
-                        <option value="supply_officer">Senior Supply Officer</option>
-                        <option value="cadet_commander">Cadet Commander</option>
-                        <option value="squadron_commander">Squadron Commander</option>
-                    </select>
-                </div>
-                
-                <div class="pt-2 flex items-center justify-end gap-2">
-                    <button type="button" id="btn-cancel-member-modal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-xl text-xs transition shadow-sm">
-                        Save Member
-                    </button>
-                </div>
-            </form>
-        </div>
-    `;
-
-    // Attach event listeners for closing
-    modal.querySelector('#btn-close-member-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
-    modal.querySelector('#btn-cancel-member-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
-
-    // Submit handler
-    modal.querySelector('#add-member-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fullName = modal.querySelector('#member-full-name').value.trim();
-        const email = modal.querySelector('#member-email').value.trim();
-        const phone = modal.querySelector('#member-phone').value.trim();
-        const role = modal.querySelector('#member-role').value;
-
-        if (!fullName || !email) {
-            if (window.showAlert) window.showAlert("Required Fields", "Please enter both name and email.", "warning");
-            return;
-        }
-
-        try {
-            const newMember = { fullName, email, phone, role };
-            AppState.membersList = AppState.membersList || [];
-            AppState.membersList.push(newMember);
-
-            renderMembersGrid();
-            renderUserRolesTable(AppState.membersList);
-
-            modal.classList.add('hidden');
-            modal.querySelector('#add-member-form').reset();
-            showToast(`Added ${fullName} to directory!`);
-        } catch (err) {
-            if (window.showAlert) window.showAlert("Error", "Could not add member: " + err.message, "error");
-        }
-    });
-
-    return modal;
-}
-
-function setupMemberModalHandlers() {
-    document.getElementById('btn-add-member')?.addEventListener('click', () => {
-        let modal = document.getElementById('new-member-modal') || document.getElementById('member-modal');
-        if (!modal) {
-            modal = createMemberModalElement();
-            document.body.appendChild(modal);
-        }
-        modal.classList.remove('hidden');
-    });
-}
-
-function renderUserRolesTable(users) {
-    const container = document.getElementById('user-roles-list');
-    if (!container) return;
-
-    container.innerHTML = (users || []).map(user => `
-        <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-            <td class="p-3 font-bold text-slate-900">${user.fullName || 'N/A'}</td>
-            <td class="p-3 text-slate-600">${user.email || 'N/A'}</td>
-            <td class="p-3 text-slate-600">${user.phone || 'N/A'}</td>
-            <td class="p-3">
-                <select data-action="update-user-role" data-uid="${user.uid || user.id}" class="p-1 border border-slate-300 rounded text-xs bg-white font-medium">
-                    <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                    <option value="cadet_supply_officer" ${user.role === 'cadet_supply_officer' ? 'selected' : ''}>Cadet Supply Officer</option>
-                    <option value="supply_officer" ${user.role === 'supply_officer' ? 'selected' : ''}>Senior Supply Officer</option>
-                    <option value="cadet_commander" ${user.role === 'cadet_commander' ? 'selected' : ''}>Cadet Commander</option>
-                    <option value="squadron_commander" ${user.role === 'squadron_commander' ? 'selected' : ''}>Squadron Commander</option>
-                </select>
-            </td>
-            <td class="p-3 text-slate-400 text-[11px]">Synced with Auth</td>
-        </tr>
-    `).join('');
 }
 
 /* --- BULK IMPORT --- */
@@ -746,6 +663,8 @@ async function processBulkInventoryImport(itemsArray) {
             title: item.title || "Untitled Item",
             categories: Array.isArray(item.cat) ? item.cat : [item.cat || "General"],
             stock: stockMap,
+            status: 'IN',
+            hideFromCatalog: !!item.hideFromCatalog,
             image: `/images/products/${tagCode}.jpg`,
             price: parseFloat(item.price) || 0,
             location: item.location || "Main Supply Closet",

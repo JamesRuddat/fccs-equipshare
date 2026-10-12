@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquipShare | Members Console</title>
+    <link rel="icon" type="image/x-icon" href="/assets/Awesome-Boxes-Packing.svg">
+
+    <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 900: '#14532d' } }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+
+    <script type="module" src="/js/components.js"></script>
+</head>
+
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+    <app-header></app-header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Header & View Navigation Switcher -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 class="text-xl font-extrabold text-slate-900">Members & Access Directory</h2>
+                <p class="text-slate-500 text-xs">Manage active unit members, issued liabilities, replacement costs, and user role privileges.</p>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1 w-full md:w-auto text-xs font-bold">
+                <button type="button" id="btn-show-members" class="flex-1 md:flex-initial px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition text-center">
+                    <i class="fa-solid fa-users mr-1.5 text-indigo-600"></i>Members & Liabilities
+                </button>
+                <button type="button" id="btn-show-roles" class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition text-center">
+                    <i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i>Roles & Access
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW 1: MEMBER DIRECTORY & FINANCIAL LIABILITIES -->
+        <section id="view-members" class="space-y-4">
+            <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Active Unit Roster & Issued Property</h3>
+                    <p class="text-xs text-slate-500">Track current items issued per member and calculated replacement liabilities.</p>
+                </div>
+                <button id="btn-add-member" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-user-plus"></i> Add New Member
+                </button>
+            </div>
+
+            <!-- Dynamic Member Cards Grid -->
+            <div id="members-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- VIEW 2: ROLES & PRIVILEGE ESCALATION -->
+        <section id="view-roles" class="space-y-4 hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-900 text-sm">Role & Privilege Escalation</h3>
+                    <p class="text-xs text-slate-500">Assign elevated privileges (Supply Officer, Commander, Admin) to registered accounts.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 uppercase font-bold border-b">
+                                <th class="p-3">Member Name</th>
+                                <th class="p-3">Email</th>
+                                <th class="p-3">Phone</th>
+                                <th class="p-3">Role</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-roles-list" class="divide-y divide-slate-100 font-medium"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <app-footer></app-footer>
+
+    <script type="module" src="/pages/members.js"></script>
+</body>
+
+</html>

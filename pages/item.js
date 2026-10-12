@@ -19,7 +19,7 @@ async function loadItemDetails() {
     const itemCode = urlParams.get('code') || urlParams.get('id');
 
     if (!itemCode) {
-        showError("No Item Specified", "Please choose an item from the supply catalog.");
+        showError("No Item Specified", "Please choose an item from the catalog.");
         return;
     }
 
@@ -71,7 +71,7 @@ function bindItemData(item) {
         statusBadge.textContent = 'In Stock';
         statusBadge.className = 'absolute top-3 right-3 text-xs font-extrabold px-3 py-1 rounded-full bg-brand-500 text-slate-950';
     } else {
-        statusBadge.textContent = item.status === 'VANGUARD' ? 'Vanguard Only' : 'Out of Stock';
+        statusBadge.textContent = item.status === 'VANGUARD' ? 'Vanguard Only' : 'Out of Supply';
         statusBadge.className = 'absolute top-3 right-3 text-xs font-extrabold px-3 py-1 rounded-full bg-amber-500 text-slate-950';
     }
 
@@ -84,7 +84,7 @@ function bindItemData(item) {
     sizeSelect.innerHTML = stockEntries.map(([size, qty]) => {
         const count = parseInt(qty, 10) || 0;
         const label = size === 'OS' ? 'Single Size' : `Size: ${size}`;
-        return `<option value="${size}" ${count <= 0 ? 'disabled' : ''}>${label} (${count > 0 ? count + ' available' : 'Out of stock'})</option>`;
+        return `<option value="${size}" ${count <= 0 ? 'disabled' : ''}>${label} (${count > 0 ? count + ' available' : 'Out of Supply'})</option>`;
     }).join('');
 
     // Toggle In-Stock vs Vanguard Actions

@@ -18,7 +18,14 @@
                         barcode: ['"Libre Barcode 39 Text"', 'cursive'],
                     },
                     colors: {
-                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 900: '#14532d' }
+                        brand: {
+                            50: '#f4f6f0',
+                            100: '#e3e8d9',
+                            500: '#65a30d', // tactical lime
+                            600: '#4d7c0f', // ranger green primary
+                            700: '#3f6212', // dark olive
+                            900: '#1a2e05'  // deep army green
+                        }
                     }
                 }
             }
@@ -37,31 +44,14 @@
 
     <app-header></app-header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
 
         <!-- Top Summary Bar & Tab Controller -->
         <div
-            class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             <div>
-                <h2 class="text-xl font-extrabold text-slate-900">Admin & Management Dashboard</h2>
-                <p class="text-slate-500 text-xs">Manage inventory stock, inline quantities, local image paths, member
-                    liabilities, and user roles.</p>
-            </div>
-
-            <!-- Tab Buttons -->
-            <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1 w-full md:w-auto text-xs font-bold">
-                <button id="tab-btn-supply"
-                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition">
-                    <i class="fa-solid fa-boxes-stacked mr-1.5 text-brand-600"></i>Supply
-                </button>
-                <button id="tab-btn-members"
-                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
-                    <i class="fa-solid fa-users mr-1.5 text-indigo-600"></i>Members & Liabilities
-                </button>
-                <button id="tab-btn-roles"
-                    class="tab-btn flex-1 md:flex-initial px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
-                    <i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i>Roles & Access
-                </button>
+                <h2 class="text-xl font-extrabold text-slate-900">Supply Management Dashboard</h2>
+                <p class="text-slate-500 text-xs">Manage inventory stock, titles, locations, quantities, and images.</p>
             </div>
         </div>
 
@@ -84,7 +74,7 @@
                             <option value="ALL">All Items</option>
                             <option value="IN">In Stock</option>
                             <option value="ISSUED">Issued</option>
-                            <option value="OUT">Out of Stock</option>
+                            <option value="OUT">Out of Supply</option>
                         </select>
                     </div>
 
@@ -205,15 +195,11 @@
 
             <div>
                 <textarea id="bulk-import-textarea" rows="10"
-                    placeholder='[&#10;  { title: "C/Amn Rank", qty: 24, cat: ["Insignia", "Ranks"], isOneSize: true }&#10;]'
-                    class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+    placeholder='[&#10;  { "title": "ABU Coat - Male", "stock": { "38R": 4, "40R": 6, "42L": 2 }, "cat": ["ABU", "Outerwear"], "price": 45.00, "location": "Rack A-1" },&#10;  { "title": "Cadet Airman Rank Pin (Pair)", "qty": 15, "cat": ["Insignia", "Ranks"], "price": 4.50, "location": "Bin 3B", "isOneSize": true },&#10;  { "title": "Squadron Banner & Stand", "qty": 1, "cat": ["Equipment", "Squadron Assets"], "price": 150.00, "location": "Display Case", "hideFromCatalog": true }&#10;]'
+    class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
 
             <div class="flex justify-between items-center pt-2 border-t border-slate-100">
-                <button type="button" id="btn-load-sample-data"
-                    class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample List
-                </button>
                 <div class="flex gap-2">
                     <button type="button" id="btn-cancel-bulk-modal"
                         class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition">Cancel</button>
@@ -237,7 +223,7 @@
                 </button>
             </div>
 
-            <form id="item-form" class="p-6 space-y-4 text-xs">
+            <form id="item-form" class="p-6 space-y-4 text-xs max-h-[85vh] overflow-y-auto">
                 <input type="hidden" id="form-doc-id">
 
                 <div class="grid grid-cols-2 gap-3">
@@ -259,17 +245,52 @@
                         class="w-full p-2.5 border border-slate-300 rounded-lg">
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">Replacement Value ($)</label>
-                        <input type="number" step="0.01" id="form-price" placeholder="45.00"
-                            class="w-full p-2.5 border border-slate-300 rounded-lg">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Replacement Value ($)</label>
+                    <input type="number" step="0.01" id="form-price" placeholder="45.00"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg">
+                </div>
+
+                <!-- CATEGORY MULTI-SELECT & INLINE RENAME TOOL -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block font-bold text-slate-700">Categories</label>
+                        <button type="button" id="btn-toggle-cat-edit"
+                            class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 transition">
+                            <i class="fa-solid fa-pen-to-square"></i> <span id="label-cat-edit-toggle">Edit Category
+                                Names</span>
+                        </button>
                     </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">Categories (Comma-separated)</label>
-                        <input type="text" id="form-categories" placeholder="Blues, Class A, Shirts"
-                            class="w-full p-2.5 border border-slate-300 rounded-lg">
+
+                    <!-- Mode 1: Checkbox Selection List -->
+                    <div id="category-checkboxes-container"
+                        class="grid grid-cols-2 gap-2 p-3 bg-slate-50 border border-slate-300 rounded-xl max-h-36 overflow-y-auto text-xs">
+                        <!-- Dynamically rendered checkboxes -->
                     </div>
+
+                    <!-- Mode 2: Inline Rename / Delete Manager (Hidden by default) -->
+                    <div id="category-inline-editor"
+                        class="hidden p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl space-y-2 max-h-48 overflow-y-auto text-xs">
+                        <!-- Dynamically rendered rename rows -->
+                    </div>
+
+                    <!-- Add New Category Input -->
+                    <div class="flex gap-2 pt-1">
+                        <input type="text" id="input-new-category" placeholder="New Category Name..."
+                            class="flex-1 p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        <button type="button" id="btn-add-new-category"
+                            class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-xs transition flex items-center gap-1 shrink-0">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2 border-t border-slate-200">
+                    <input type="checkbox" id="form-hide-from-catalog"
+                        class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                    <label for="form-hide-from-catalog" class="text-xs font-bold text-slate-700 cursor-pointer">
+                        Pull from being issued (Squadron-Owned / Internal Only)
+                    </label>
                 </div>
 
                 <div>
@@ -316,7 +337,7 @@
     </div>
 
     <app-footer></app-footer>
-    <script type="module" src="/pages/admin.js"></script>
+    <script type="module" src="/pages/supply.js"></script>
 </body>
 
 </html>

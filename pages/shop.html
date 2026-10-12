@@ -17,7 +17,14 @@
                         barcode: ['"Libre Barcode 39 Text"', 'cursive'],
                     },
                     colors: {
-                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 900: '#14532d' }
+                        brand: {
+                            50: '#f4f6f0',
+                            100: '#e3e8d9',
+                            500: '#65a30d', // Tactical Lime
+                            600: '#4d7c0f', // Ranger Green Primary
+                            700: '#3f6212', // Dark Olive
+                            900: '#1a2e05'  // deep army green
+                        }
                     }
                 }
             }
@@ -71,13 +78,13 @@
         </div>
 
         <!-- MEMBER SHOPPING CATALOG -->
-        <section id="view-shop" class="space-y-5">
+        <section id="view-shop" class="space-y-4">
             <div
-                class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 border border-slate-700">
+                class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-2 border border-slate-700">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Browse Supply Catalog</h1>
+                    <h1 class="text-3xl sm:text-3xl font-extrabold tracking-tight">Browse Catalog</h1>
                     <p class="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
-                        Add supply items to your Cart. If an item is out of stock, members can click the
+                        Add supply items to your Cart. If an item is out of supply, members can click the
                         <strong>Vanguard link</strong> to purchase directly, or a member of staff can request a
                         <strong>Booster Club
                             order</strong>.
@@ -114,7 +121,7 @@
                         <option value="OCP">OCPs</option>
                         <option value="ABU">ABUs</option>
                         <option value="Blues">Blues Uniforms</option>
-                        <option value="Dress">Dress Uniforms</option>
+                        <option value="Mess Dress">Dress Uniforms</option>
                         <option value="Outerwear">Outerwear & Coats</option>
                         <option value="Footwear">Footwear & Boots</option>
                         <option value="Accessories">Accessories & Gear</option>
@@ -124,7 +131,7 @@
                         class="bg-slate-50 border border-slate-300 text-slate-700 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-brand-500">
                         <option value="ALL">Show All Items</option>
                         <option value="IN">Show Available (In Supply)</option>
-                        <option value="OUT">Show Out of Stock / Vanguard</option>
+                        <option value="OUT">Show Out of Supply / Vanguard</option>
                     </select>
                 </div>
             </div>

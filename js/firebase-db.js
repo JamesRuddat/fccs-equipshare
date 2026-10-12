@@ -88,6 +88,7 @@ export async function createSupplyItem(itemData) {
         stock: stockMap,
         isOneSize: Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS",
         status: initialStatus, // Options: "IN", "REQUESTED", "ISSUED", "VANGUARD", "OUT"
+        hideFromCatalog: !!itemData.hideFromCatalog, // Stores true for squadron-owned/hidden items
         vanguardUrl: itemData.vanguardUrl || "",
         image: itemData.image || "",
         createdAt: serverTimestamp()
@@ -127,6 +128,7 @@ export async function updateSupplyItem(itemId, updatedData) {
     if (updatedData.vanguardUrl !== undefined) cleanPayload.vanguardUrl = updatedData.vanguardUrl;
     if (updatedData.image !== undefined) cleanPayload.image = updatedData.image;
     if (updatedData.status !== undefined) cleanPayload.status = updatedData.status;
+    if (updatedData.hideFromCatalog !== undefined) cleanPayload.hideFromCatalog = !!updatedData.hideFromCatalog;
 
     if (updatedData.stock !== undefined) {
         const stockMap = parseStock(updatedData.stock);
@@ -161,7 +163,7 @@ export async function requestSupplyItem(itemId, memberData, selectedSize = "OS")
 
     const currentQty = parseInt(stockMap[targetSize] || 0, 10);
     if (currentQty <= 0) {
-        throw new Error(`Size "${targetSize}" is out of stock for "${itemData.title}".`);
+        throw new Error(`Size "${targetSize}" is out of supply for "${itemData.title}".`);
     }
 
     // Reserve stock quantity for this request

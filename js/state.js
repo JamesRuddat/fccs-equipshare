@@ -4,12 +4,21 @@ export const AppState = {
     supply: [],
     membersList: [],
     cart: JSON.parse(localStorage.getItem('equipshare_cart') || '[]'),
+    requisition: JSON.parse(localStorage.getItem('equipshare_requisition') || '[]'),
     currentUser: null
 };
 
+export function saveRequisition() {
+    try {
+        localStorage.setItem('equipshare_requisition', JSON.stringify(AppState.requisition || []));
+    } catch (e) {
+        console.error("Failed to write requisition to localStorage:", e);
+    }
+    window.dispatchEvent(new CustomEvent('requisition-updated'));
+}
+
 export function saveCart() {
     localStorage.setItem('equipshare_cart', JSON.stringify(AppState.cart || []));
-    
     // Notify all web components and scripts that the cart was updated
     window.dispatchEvent(new CustomEvent('cart-updated'));
 }
