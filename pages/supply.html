@@ -121,12 +121,9 @@
                                 <th class="p-3">Location</th>
                                 <th class="p-3">Area</th>
                                 <th class="p-3">Title</th>
-                                <th class="p-3">Value</th>
-                                <th class="p-3">Categories</th>
                                 <th class="p-3">Sizes / Stock</th>
                                 <th class="p-3">Status</th>
-                                <th class="p-3">Vanguard</th>
-                                <th class="p-3 text-right">Actions</th>
+                                <th class="p-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="admin-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
@@ -195,8 +192,8 @@
 
             <div>
                 <textarea id="bulk-import-textarea" rows="10"
-    placeholder='[&#10;  { "title": "ABU Coat - Male", "stock": { "38R": 4, "40R": 6, "42L": 2 }, "cat": ["ABU", "Outerwear"], "price": 45.00, "location": "Rack A-1" },&#10;  { "title": "Cadet Airman Rank Pin (Pair)", "qty": 15, "cat": ["Insignia", "Ranks"], "price": 4.50, "location": "Bin 3B", "isOneSize": true },&#10;  { "title": "Squadron Banner & Stand", "qty": 1, "cat": ["Equipment", "Squadron Assets"], "price": 150.00, "location": "Display Case", "hideFromCatalog": true }&#10;]'
-    class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                    placeholder='[&#10;  { "title": "ABU Coat - Male", "stock": { "38R": 4, "40R": 6, "42L": 2 }, "cat": ["ABU", "Outerwear"], "price": 45.00, "location": "Rack A-1" },&#10;  { "title": "Cadet Airman Rank Pin (Pair)", "qty": 15, "cat": ["Insignia", "Ranks"], "price": 4.50, "location": "Bin 3B", "isOneSize": true },&#10;  { "title": "Squadron Banner & Stand", "qty": 1, "cat": ["Equipment", "Squadron Assets"], "price": 150.00, "location": "Display Case", "hideFromCatalog": true }&#10;]'
+                    class="w-full p-3 bg-slate-900 text-slate-100 border border-slate-800 rounded-xl font-mono text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
 
             <div class="flex justify-between items-center pt-2 border-t border-slate-100">
@@ -209,6 +206,50 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Direct Issue Gear Modal -->
+    <div id="direct-issue-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-100">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900"><i
+                        class="fa-solid fa-hand-holding-hand text-indigo-600 mr-2"></i>Direct Issue Gear</h3>
+                <button type="button" id="btn-close-direct-issue-modal" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="direct-issue-form" class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Item</label>
+                    <div id="direct-issue-item-title"
+                        class="p-2.5 bg-slate-100 rounded-lg font-bold text-sm text-slate-800"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Select Size</label>
+                    <select id="direct-issue-size-select"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Assign To Member</label>
+                    <select id="direct-issue-member-select"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500"
+                        required></select>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" id="btn-cancel-direct-issue-modal"
+                        class="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                        Confirm & Issue Gear
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -293,11 +334,26 @@
                     </label>
                 </div>
 
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">Sizes & Quantities / Total Stock *</label>
-                    <input type="text" id="form-sizes" required
-                        placeholder='e.g., "10" (for one-size) OR "15.5R: 5, 16.0R: 3"'
-                        class="w-full p-2.5 border border-slate-300 rounded-lg font-mono">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-600 uppercase">Stock & Sizes</label>
+                        <div class="flex items-center gap-1 flex-wrap">
+      <span class="text-[10px] text-slate-400 font-bold mr-1">Presets:</span>
+      <button type="button" id="preset-s-m-l" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">S-M-L</button>
+      <button type="button" id="preset-ocp" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">OCP</button>
+      <button type="button" id="preset-hats" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Hats</button>
+      <button type="button" id="preset-female" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Female</button>
+      <button type="button" id="preset-dress-shirts" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Dress Shirts</button>
+    </div>
+                    </div>
+
+                    <!-- Dynamic Size Rows Container -->
+                    <div id="size-rows-container" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+
+                    <button type="button" id="btn-add-size-row"
+                        class="w-full py-2 bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold rounded-xl text-xs transition border border-dashed border-slate-300 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-plus text-xs"></i> Add Another Size
+                    </button>
                 </div>
 
                 <!-- IMAGE PICKER & FILE UPLOADER -->

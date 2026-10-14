@@ -1,12 +1,12 @@
 // /js/firebase-db.js - Clean Data Access Layer with Workflow & Size Support
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { 
+import {
     getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc,
-    addDoc, getDocs, query, where, serverTimestamp 
+    addDoc, getDocs, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { 
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-    onAuthStateChanged, signOut 
+import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -52,7 +52,7 @@ const parseStock = (stockInput, defaultQuantity = 1) => {
         });
         return Object.keys(cleanStock).length > 0 ? cleanStock : { "OS": defaultQuantity };
     }
-    
+
     const qty = parseInt(stockInput, 10);
     return { "OS": !isNaN(qty) && qty >= 0 ? qty : defaultQuantity };
 };
@@ -135,7 +135,7 @@ export async function updateSupplyItem(itemId, updatedData) {
         cleanPayload.stock = stockMap;
         cleanPayload.sizes = Object.keys(stockMap);
         cleanPayload.isOneSize = Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS";
-        
+
         // Preserve VANGUARD or active workflow status if already set
         if (!cleanPayload.status) {
             const totalQty = getTotalQuantity(stockMap);
@@ -146,6 +146,41 @@ export async function updateSupplyItem(itemId, updatedData) {
     if (updatedData.categories !== undefined) cleanPayload.categories = parseArray(updatedData.categories);
 
     await updateDoc(itemRef, cleanPayload);
+}
+
+/**
+ * DIRECT ISSUE: Supply Officer directly assigns an available item to a member.
+ */
+export async function issueSupplyItemToMember(itemId, memberData, selectedSize = "OS") {
+    const itemRef = doc(db, "supply", itemId);
+    const itemDoc = await getDoc(itemRef);
+
+    if (!itemDoc.exists()) throw new Error("Item does not exist.");
+
+    const itemData = itemDoc.data();
+    const stockMap = { ...(itemData.stock || { "OS": 1 }) };
+    const targetSize = (selectedSize || "OS").toUpperCase().trim();
+
+    const currentQty = parseInt(stockMap[targetSize] || 0, 10);
+    if (currentQty <= 0) {
+        throw new Error(`Size "${targetSize}" is out of supply for "${itemData.title}".`);
+    }
+
+    // Deduct stock for the issued item
+    stockMap[targetSize] = currentQty - 1;
+
+    // Check if remaining stock across all sizes is 0
+    const totalRemaining = getTotalQuantity(stockMap);
+    const newStatus = totalRemaining > 0 ? "IN" : "OUT";
+
+    await updateDoc(itemRef, {
+        stock: stockMap,
+        status: itemData.status === "VANGUARD" ? "VANGUARD" : newStatus,
+        lastIssuedToUid: memberData.uid || null,
+        lastIssuedToEmail: memberData.email ? memberData.email.toLowerCase().trim() : null,
+        lastIssuedToName: memberData.fullName || memberData.displayName || "Member",
+        lastIssuedDate: serverTimestamp()
+    });
 }
 
 /**

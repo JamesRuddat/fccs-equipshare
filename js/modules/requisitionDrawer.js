@@ -18,6 +18,7 @@ export function addToRequisitionQueue(item, quantity = 1) {
     }
 
     saveRequisition();
+    window.dispatchEvent(new CustomEvent('requisition-updated'));
     showToast(`Added ${parsedQty}x ${item.title} to Requisition Queue.`);
 }
 
@@ -49,14 +50,14 @@ export function renderRequisitionDrawer() {
 
             <!-- Quantity Adjuster -->
             <div class="flex items-center border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
-                <button type="button" data-req-action="adjust-qty" data-req-index="${index}" data-delta="-1" class="px-2 py-1 text-slate-600 hover:bg-slate-200 font-bold transition">-</button>
+                <button type="button" data-req-action="adjust-qty" data-req-index="${index}" data-delta="-1" class="px-2 py-1 text-slate-600 hover:bg-slate-200 font-bold transition cursor-pointer">-</button>
                 <span class="px-2 text-xs font-extrabold text-slate-800">${item.quantity}</span>
-                <button type="button" data-req-action="adjust-qty" data-req-index="${index}" data-delta="1" class="px-2 py-1 text-slate-600 hover:bg-slate-200 font-bold transition">+</button>
+                <button type="button" data-req-action="adjust-qty" data-req-index="${index}" data-delta="1" class="px-2 py-1 text-slate-600 hover:bg-slate-200 font-bold transition cursor-pointer">+</button>
             </div>
 
             <!-- Remove Button -->
-            <button type="button" data-req-action="remove-item" data-req-index="${index}" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition">
-                <i class="fa-solid fa-trash-can text-sm"></i>
+            <button type="button" data-req-action="remove-item" data-req-index="${index}" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer" title="Remove item">
+                <i class="fa-solid fa-trash-can text-sm pointer-events-none"></i>
             </button>
         </div>
     `).join('');
@@ -77,29 +78,35 @@ export function setupRequisitionDrawer() {
 
         if (toggleBtn) {
             e.preventDefault();
-            e.stopPropagation();
             renderRequisitionDrawer();
             drawer?.classList.remove('hidden');
-        } else if (closeBtn) {
+            return;
+        }
+
+        if (closeBtn) {
             e.preventDefault();
-            e.stopPropagation();
             drawer?.classList.add('hidden');
-        } else if (e.target === drawer) {
+            return;
+        }
+
+        if (e.target === drawer) {
             drawer.classList.add('hidden');
+            return;
         }
 
         if (removeBtn) {
             e.preventDefault();
-            e.stopPropagation();
             const index = parseInt(removeBtn.dataset.reqIndex, 10);
             if (AppState.requisition && index >= 0) {
                 AppState.requisition.splice(index, 1);
                 saveRequisition();
+                window.dispatchEvent(new CustomEvent('requisition-updated'));
             }
-        } else if (qtyBtn) {
+            return;
+        }
+
+        if (qtyBtn) {
             e.preventDefault();
-            e.stopPropagation(); // Prevents double-firing from outer container listeners
-            
             const index = parseInt(qtyBtn.dataset.reqIndex, 10);
             const delta = parseInt(qtyBtn.dataset.delta, 10);
 
@@ -111,11 +118,13 @@ export function setupRequisitionDrawer() {
                     AppState.requisition[index].quantity = newQty;
                 }
                 saveRequisition();
+                window.dispatchEvent(new CustomEvent('requisition-updated'));
             }
+            return;
         }
     });
 
-    // Netlify Form Submission Listener
+    // Netlify Form Handler
     const reqForm = document.getElementById('requisition-netlify-form');
     if (reqForm) {
         reqForm.addEventListener('submit', async (e) => {
@@ -126,7 +135,6 @@ export function setupRequisitionDrawer() {
                 return;
             }
 
-            // Encode items into the hidden input field
             const itemsInput = document.getElementById('requisition-items-input');
             if (itemsInput) {
                 itemsInput.value = JSON.stringify(AppState.requisition, null, 2);
@@ -145,10 +153,11 @@ export function setupRequisitionDrawer() {
                     showToast("Requisition sent successfully!");
                     AppState.requisition = [];
                     saveRequisition();
+                    window.dispatchEvent(new CustomEvent('requisition-updated'));
                     document.getElementById('requisition-drawer')?.classList.add('hidden');
                     reqForm.reset();
                 } else {
-                    throw new Error("Form submit failed");
+                    throw new Error(`Submit failed with status: ${response.status}`);
                 }
             } catch (err) {
                 console.error("Netlify form error:", err);

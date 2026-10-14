@@ -1,10 +1,12 @@
-<div id="requisition-drawer" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden transition-opacity no-print">
+<div id="requisition-drawer"
+    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden transition-opacity no-print">
     <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
         <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col">
             <!-- Drawer Header -->
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
                 <h3 class="font-bold text-base flex items-center gap-2">
-                    <i class="fa-solid fa-truck-ramp-box text-amber-500"></i> Requisition List (<span id="requisition-drawer-count">0</span>)
+                    <i class="fa-solid fa-truck-ramp-box text-amber-500"></i> Requisition List (<span
+                        id="requisition-drawer-count">0</span>)
                 </h3>
                 <button id="btn-close-requisition-drawer" type="button" class="text-slate-400 hover:text-white p-1">
                     <i class="fa-solid fa-xmark text-xl"></i>
@@ -16,16 +18,20 @@
 
             <!-- Drawer Footer & Form -->
             <div class="p-4 bg-slate-50 border-t border-slate-200 space-y-3">
-                <form id="requisition-netlify-form" name="booster-requisition" method="POST" data-netlify="true" class="space-y-3">
+                <form id="requisition-netlify-form" name="booster-requisition" method="POST" data-netlify="true"
+                    class="space-y-3" netlify>
                     <input type="hidden" name="form-name" value="booster-requisition" />
                     <input type="hidden" id="requisition-items-input" name="requested_items" />
 
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Staff Notes / Special Instructions</label>
-                        <textarea name="notes" rows="2" placeholder="Provide context or instructions for this order..." class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none"></textarea>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Staff Notes / Special
+                            Instructions</label>
+                        <textarea name="notes" rows="2" placeholder="Provide context or instructions for this order..."
+                            class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none"></textarea>
                     </div>
 
-                    <button type="submit" id="btn-submit-requisition" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+                    <button type="submit" id="btn-submit-requisition"
+                        class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
                         <i class="fa-solid fa-paper-plane"></i> Submit Requisition
                     </button>
                 </form>

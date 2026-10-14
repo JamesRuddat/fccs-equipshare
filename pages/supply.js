@@ -1,11 +1,13 @@
-// /js/supply.js - Supply Inventory Master Console & Bulk Import Manager
+// /js/supply.js - Supply Inventory Master Console & Dynamic Size Manager
 import { AppState, showToast } from '/js/state.js';
 import { initAuth } from '/js/auth.js';
 import { 
     getSupplyItems, 
     createSupplyItem, 
     updateSupplyItem, 
-    issueSupplyItem 
+    issueSupplyItem,
+    issueSupplyItemToMember,
+    getAllUsers
 } from '/js/firebase-db.js';
 
 // Fallback image asset
@@ -13,6 +15,8 @@ const CAP_FALLBACK_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb
 
 // Preset default categories
 const DEFAULT_CATEGORIES = ["ABU", "OCP", "Blues", "Insignia", "Outerwear", "Headwear", "Boots", "Equipment", "General"];
+
+let activeDirectIssueItemId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initAuth(async (user) => {
@@ -23,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAdminFilters();
     setupImageUploadListeners();
     setupInlineCategoryEditor();
+    setupDirectIssueForm();
+    setupSizeManagerEvents();
 
     refreshSupplyData();
 });
@@ -53,6 +59,132 @@ async function refreshSupplyData() {
     } catch (err) {
         console.error("Error refreshing supply data:", err);
     }
+}
+
+/* --- DYNAMIC SIZE MANAGER UI LOGIC (COMPACT FOOTPRINT) --- */
+function renderSizeFormRows(stockMap = { "One Size": 0 }, mergeWithExisting = false) {
+    const container = document.getElementById('size-rows-container');
+    if (!container) return;
+
+    let targetStockMap = { ...stockMap };
+
+    // If merging, preserve existing quantities for matching sizes
+    if (mergeWithExisting) {
+        const currentMap = getStockMapFromFormRows();
+        
+        // Merge existing keys with new preset keys
+        const mergedKeys = new Set([...Object.keys(currentMap), ...Object.keys(stockMap)]);
+        targetStockMap = {};
+
+        mergedKeys.forEach(sz => {
+            // Keep existing quantity if present; otherwise use the preset default
+            targetStockMap[sz] = currentMap[sz] !== undefined ? currentMap[sz] : (stockMap[sz] || 0);
+        });
+    }
+
+    const entries = Object.entries(targetStockMap);
+    if (entries.length === 0) entries.push(["One Size", 0]);
+
+    container.innerHTML = entries.map(([size, qty]) => `
+        <div class="size-input-row flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+            <div class="flex-1">
+                <input type="text" value="${size}" class="size-label-input w-full p-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-800 uppercase focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="Size (e.g. S, M, L, 10.5)">
+            </div>
+            <div class="w-16">
+                <input type="number" min="0" value="${qty}" class="size-qty-input w-full p-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-800 text-center focus:ring-1 focus:ring-brand-500 focus:outline-none" title="Quantity">
+            </div>
+            <button type="button" data-action="remove-size-row" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition" title="Remove Size">
+                <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function getStockMapFromFormRows() {
+    const rows = document.querySelectorAll('.size-input-row');
+    const stockMap = {};
+
+    rows.forEach(row => {
+        const sizeInput = row.querySelector('.size-label-input');
+        const qtyInput = row.querySelector('.size-qty-input');
+        const size = sizeInput?.value.trim().toUpperCase() || "One Size";
+        const qty = parseInt(qtyInput?.value, 10);
+
+        if (size) {
+            stockMap[size] = !isNaN(qty) && qty >= 0 ? qty : 0;
+        }
+    });
+
+    return Object.keys(stockMap).length > 0 ? stockMap : { "One Size": 0 };
+}
+
+function setupSizeManagerEvents() {
+    const sizeContainer = document.getElementById('size-rows-container');
+    if (sizeContainer) {
+        sizeContainer.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('[data-action="remove-size-row"]');
+            if (removeBtn) {
+                const row = removeBtn.closest('.size-input-row');
+                if (document.querySelectorAll('.size-input-row').length > 1) {
+                    row.remove();
+                } else {
+                    showToast("An item must have at least One Size entry.");
+                }
+            }
+        });
+    }
+
+    // Add Blank Size Row Button
+    document.getElementById('btn-add-size-row')?.addEventListener('click', () => {
+        const currentStock = getStockMapFromFormRows();
+        currentStock[`SZ_${Object.keys(currentStock).length + 1}`] = 0;
+        renderSizeFormRows(currentStock);
+    });
+
+    // Preset Size Buttons (merges with existing sizes)
+    document.getElementById('preset-s-m-l')?.addEventListener('click', () => {
+        renderSizeFormRows({ "X-Small": 0, "Small": 0, "Medium": 0, "Large": 0, "XL": 0 }, true);
+    });
+
+    // 1. Hat Sizes Preset
+    document.getElementById('preset-hats')?.addEventListener('click', () => {
+        const hatMap = {
+            "6": 0, "6 3/8": 0, "6 1/2": 0, "6 5/8": 0, "6 3/4": 0, 
+            "6 7/8": 0, "7": 0, "7 1/8": 0, "7 1/4": 0, "7 3/8": 0, 
+            "7 1/2": 0, "7 5/8": 0, "7 3/4": 0, "7 7/8": 0, "8": 0
+        };
+        renderSizeFormRows(hatMap, true);
+    });
+
+    // 2. OCP / ABU Garment Sizes Preset (Chest/Length)
+    document.getElementById('preset-ocp')?.addEventListener('click', () => {
+        const ocpMap = {
+            "Extra Small - Regular": 0, "Small - Regular": 0, "Small - Short": 0, "Small - Long": 0, 
+            "Medium - Regular": 0, "Medium - Short": 0, "Medium - Long": 0, 
+            "Large - Regular": 0, "Large - Short": 0, "Large - Long": 0, 
+            "Extra Large - Regular": 0, "Extra Large - Long": 0
+        };
+        renderSizeFormRows(ocpMap, true);
+    });
+
+    // 3. Female Uniform Sizes Preset (Even numeric sizes)
+    document.getElementById('preset-female')?.addEventListener('click', () => {
+        const femaleMap = {
+            "2R": 0, "4R": 0, "6R": 0, "8R": 0, 
+            "10R": 0, "12R": 0, "14R": 0, "16R": 0, "18R": 0
+        };
+        renderSizeFormRows(femaleMap, true);
+    });
+
+    // 4. Male Dress Shirt Sizes Preset (Neck/Sleeve)
+    document.getElementById('preset-dress-shirts')?.addEventListener('click', () => {
+        const shirtMap = {
+            "14.5 / 32-33": 0, "15 / 32-33": 0, "15.5 / 32-33": 0, "15.5 / 34-35": 0,
+            "16 / 32-33": 0, "16 / 34-35": 0, "16.5 / 34-35": 0, "17 / 34-35": 0
+        };
+        renderSizeFormRows(shirtMap, true);
+    });
+
 }
 
 /* --- CATEGORY MULTI-SELECT & INLINE EDITOR LOGIC --- */
@@ -104,12 +236,10 @@ function setupInlineCategoryEditor() {
         const isEditing = !inlineEditor?.classList.contains('hidden');
 
         if (isEditing) {
-            // Switch back to Checkbox View
             inlineEditor?.classList.add('hidden');
             checkboxContainer?.classList.remove('hidden');
             if (labelToggle) labelToggle.textContent = 'Edit Category Names';
         } else {
-            // Render and Switch to Inline Rename View
             renderInlineCategoryRows();
             checkboxContainer?.classList.add('hidden');
             inlineEditor?.classList.remove('hidden');
@@ -136,7 +266,6 @@ function renderInlineCategoryRows() {
         </div>
     `).join('');
 
-    // Attach row events
     container.querySelectorAll('[data-action="save-inline-rename"]').forEach(btn => {
         btn.addEventListener('click', async () => {
             const oldName = btn.dataset.original;
@@ -220,7 +349,7 @@ function setupAdminFilters() {
             tagInput.value = formatLocationCode(tagInput.value);
             const imgInput = document.getElementById('form-image-path');
             if (imgInput && !imgInput.value && tagInput.value) {
-                imgInput.value = `/images/products/${tagInput.value}.jpg`;
+                imgInput.value = ``;
             }
         });
     }
@@ -254,17 +383,20 @@ function setupAdminFilters() {
     document.getElementById('btn-close-item-modal')?.addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-item-modal')?.addEventListener('click', closeItemModal);
 
-    // Delegation targeting item.id
     document.getElementById('admin-table-body')?.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('[data-action="edit-item"]');
         const adjustStockBtn = e.target.closest('[data-action="adjust-stock"]');
         const toggleVisBtn = e.target.closest('[data-action="toggle-visibility"]');
+        const directIssueBtn = e.target.closest('[data-action="direct-issue-item"]');
 
-        if (editBtn) {
+        if (directIssueBtn) {
+            const docId = directIssueBtn.dataset.docId;
+            openDirectIssueModal(docId);
+        } else if (editBtn) {
             openItemModal(editBtn.dataset.docId);
         } else if (adjustStockBtn) {
             const docId = adjustStockBtn.dataset.docId;
-            const sizeKey = adjustStockBtn.dataset.sizeKey || "OS";
+            const sizeKey = adjustStockBtn.dataset.sizeKey || "One Size";
             const delta = parseInt(adjustStockBtn.dataset.delta, 10) || 0;
             await quickAdjustItemStock(docId, sizeKey, delta);
         } else if (toggleVisBtn) {
@@ -283,6 +415,8 @@ function setupAdminFilters() {
 
     document.getElementById('pending-orders-table-body')?.addEventListener('click', async (e) => {
         const confirmBtn = e.target.closest('[data-action="confirm-issue"]');
+        const deleteBtn = e.target.closest('[data-action="delete-request"]');
+
         if (confirmBtn) {
             const docId = confirmBtn.dataset.docId;
             try {
@@ -292,6 +426,39 @@ function setupAdminFilters() {
             } catch (err) {
                 if (window.showAlert) {
                     window.showAlert("Failed to issue item", err.message, "error");
+                }
+            }
+        } else if (deleteBtn) {
+            const docId = deleteBtn.dataset.docId;
+            const requestedSize = deleteBtn.dataset.requestedSize || "One Size";
+
+            if (confirm("Are you sure you want to cancel and delete this order request?")) {
+                try {
+                    const item = (AppState.supply || []).find(i => i.id === docId);
+                    if (item) {
+                        const stockMap = { ...(item.stock || { "One Size": 0 }) };
+                        const currentQty = parseInt(stockMap[requestedSize] || 0, 10);
+                        stockMap[requestedSize] = currentQty + 1;
+
+                        await updateSupplyItem(docId, {
+                            stock: stockMap,
+                            status: "IN",
+                            requestedByUid: null,
+                            requestedByEmail: null,
+                            requestedByName: null,
+                            requestedPhone: null,
+                            requestedSize: null,
+                            requestedAt: null
+                        });
+                    }
+
+                    await refreshSupplyData();
+                    showToast("Order request canceled and stock returned.");
+                } catch (err) {
+                    console.error("Failed to cancel request:", err);
+                    if (window.showAlert) {
+                        window.showAlert("Failed to delete request", err.message, "error");
+                    }
                 }
             }
         }
@@ -335,6 +502,82 @@ function setupAdminFilters() {
             } finally {
                 btnRunBulk.disabled = false;
                 btnRunBulk.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Execute Import`;
+            }
+        });
+    }
+}
+
+/* --- DIRECT ISSUE MODAL CONTROLLERS --- */
+export async function openDirectIssueModal(itemId) {
+    activeDirectIssueItemId = itemId;
+    const modal = document.getElementById('direct-issue-modal');
+    const memberSelect = document.getElementById('direct-issue-member-select');
+    const sizeSelect = document.getElementById('direct-issue-size-select');
+    const titleEl = document.getElementById('direct-issue-item-title');
+    const item = (AppState.supply || []).find(i => i.id === itemId);
+
+    if (!item || !modal) return;
+
+    if (titleEl) {
+        titleEl.textContent = `${item.title || 'Untitled Item'} (${item.locationCode || 'N/A'})`;
+    }
+
+    const stockMap = item.stock || { "One Size": 0 };
+    if (sizeSelect) {
+        sizeSelect.innerHTML = Object.entries(stockMap)
+            .map(([size, qty]) => `<option value="${size}" ${qty <= 0 ? 'disabled' : ''}>Size ${size} (${qty} available)</option>`)
+            .join('');
+    }
+
+    try {
+        const users = await getAllUsers();
+        if (memberSelect) {
+            memberSelect.innerHTML = `<option value="">-- Select Member --</option>` + 
+                users.map(u => {
+                    const displayName = u.fullName || u.email || 'Unnamed Member';
+                    return `<option value="${u.id}" data-name="${displayName}" data-email="${u.email || ''}">${displayName}</option>`;
+                }).join('');
+        }
+    } catch (err) {
+        console.error("Failed to fetch member directory:", err);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function setupDirectIssueForm() {
+    document.getElementById('btn-close-direct-issue-modal')?.addEventListener('click', closeItemModal);
+    document.getElementById('btn-cancel-direct-issue-modal')?.addEventListener('click', closeItemModal);
+
+    const directIssueForm = document.getElementById('direct-issue-form');
+    if (directIssueForm) {
+        directIssueForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!activeDirectIssueItemId) return;
+
+            const memberSelect = document.getElementById('direct-issue-member-select');
+            const selectedOption = memberSelect.options[memberSelect.selectedIndex];
+            const sizeSelect = document.getElementById('direct-issue-size-select');
+
+            if (!memberSelect.value) {
+                if (window.showAlert) window.showAlert("Select Member", "Please select a member to receive gear.", "error");
+                return;
+            }
+
+            const memberData = {
+                uid: memberSelect.value,
+                fullName: selectedOption.dataset.name,
+                email: selectedOption.dataset.email
+            };
+
+            try {
+                await issueSupplyItemToMember(activeDirectIssueItemId, memberData, sizeSelect.value);
+                closeItemModal();
+                await refreshSupplyData();
+                showToast(`Successfully issued gear to ${memberData.fullName}!`);
+            } catch (err) {
+                console.error("Direct issue error:", err);
+                if (window.showAlert) window.showAlert("Issue Failed", err.message, "error");
             }
         });
     }
@@ -395,10 +638,13 @@ function renderPendingOrdersQueue() {
             <td class="p-2 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
             <td class="p-2 font-semibold text-slate-800">${item.title}</td>
             <td class="p-2 text-slate-700">${item.requestedByName || 'Member'}</td>
-            <td class="p-2 font-mono text-xs">${item.requestedSize || 'OS'}</td>
-            <td class="p-2 text-right">
+            <td class="p-2 font-mono text-xs">${item.requestedSize || 'One Size'}</td>
+            <td class="p-2 text-right space-x-2">
                 <button data-action="confirm-issue" data-doc-id="${item.id}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition shadow-sm">
                     <i class="fa-solid fa-hand-holding mr-1"></i> Hand Out & Issue
+                </button>
+                <button data-action="delete-request" data-doc-id="${item.id}" data-requested-size="${item.requestedSize || 'One Size'}" class="bg-red-500 hover:bg-red-600 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition shadow-sm" title="Cancel/Delete Request">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Delete
                 </button>
             </td>
         </tr>
@@ -410,7 +656,7 @@ async function quickAdjustItemStock(itemId, sizeKey, delta) {
     const item = (AppState.supply || []).find(i => i.id === itemId);
     if (!item) return;
 
-    const stockMap = { ...(item.stock || { "OS": 0 }) };
+    const stockMap = { ...(item.stock || { "One Size": 0 }) };
     const currentQty = parseInt(stockMap[sizeKey] || 0, 10);
     const newQty = Math.max(0, currentQty + delta);
 
@@ -443,22 +689,23 @@ function renderAdminTable() {
     });
 
     if (filtered.length === 0) {
-        bodyContainer.innerHTML = `<tr><td colspan="10" class="p-6 text-center text-slate-400">No supply items found.</td></tr>`;
+        bodyContainer.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">No supply items found.</td></tr>`;
         return;
     }
 
     bodyContainer.innerHTML = filtered.map(item => {
-        const stockMap = item.stock || { "OS": 0 };
+        const stockMap = item.stock || { "One Size": 0 };
         const totalQty = Object.values(stockMap).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
-        const thumbSrc = item.image && item.image.trim() !== "" ? item.image : `/images/products/${item.locationCode || 'placeholder'}.jpg`;
+        const thumbSrc = item.image && item.image.trim() !== "" ? item.image : ``;
         const isHidden = item.hideFromCatalog === true || item.hideFromCatalog === 'true';
+        const priceVal = parseFloat(item.price) || 0;
 
         const inlineStockControls = Object.entries(stockMap).map(([sz, qty]) => `
-            <div class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-mono mr-1 mb-1">
+            <div class="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[11px] font-mono mr-1 mb-1">
                 <span class="font-bold text-slate-700">${sz}:</span>
-                <span class="font-extrabold text-slate-900 mx-1">${qty}</span>
-                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="-1" class="text-red-500 hover:text-red-700 hover:bg-slate-200 w-4 h-4 rounded flex items-center justify-center font-bold" title="Decrease 1">-</button>
-                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="1" class="text-brand-600 hover:text-brand-800 hover:bg-slate-200 w-4 h-4 rounded flex items-center justify-center font-bold" title="Increase 1">+</button>
+                <span class="font-extrabold text-slate-900 mx-0.5">${qty}</span>
+                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="-1" class="text-red-500 hover:text-red-700 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Decrease 1">-</button>
+                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="1" class="text-brand-600 hover:text-brand-800 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Increase 1">+</button>
             </div>
         `).join('');
 
@@ -476,36 +723,50 @@ function renderAdminTable() {
         }
 
         const visibilityBadge = isHidden 
-            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 inline-flex items-center gap-1"></i>Unavailable</span>`
-            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Available</span>`;
-
-        const categoryText = Array.isArray(item.categories) ? item.categories.join(', ') : (item.categories || item.category || 'General');
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 inline-block">Unavailable</span>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 inline-block">Available</span>`;
 
         return `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition ${isHidden ? 'bg-slate-50/60' : ''}">
                 <td class="p-2 w-12">
                     <img src="${thumbSrc}" onerror="this.onerror=null; this.src='${CAP_FALLBACK_IMAGE}';" alt="" class="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-sm">
                 </td>
-                <td class="p-3 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
-                <td class="p-3 text-slate-600">${item.location || 'Closet Slot'}</td>
-                <td class="p-3 font-semibold text-slate-900">
+                <td class="p-2.5 font-mono font-bold text-slate-900 text-xs">${item.locationCode || 'N/A'}</td>
+                <td class="p-2.5 text-slate-600 text-xs">${item.location || 'Closet Slot'}</td>
+                <td class="p-2.5 font-semibold text-slate-900 text-xs">
                     <div>${item.title || 'Untitled Item'}</div>
-                    <div class="mt-1">${visibilityBadge}</div>
                 </td>
-                <td class="p-3 font-mono font-bold text-slate-900">$${(parseFloat(item.price) || 0).toFixed(2)}</td>
-                <td class="p-3 text-slate-500">${categoryText}</td>
-                <td class="p-3 font-mono text-[11px] min-w-[200px]">${inlineStockControls} <div class="text-[10px] text-slate-400 font-sans mt-0.5">Total: <strong class="text-brand-600">${totalQty}</strong></div></td>
-                <td class="p-3">${statusBadge}</td>
-                <td class="p-3">
-                    ${item.vanguardUrl ? `<a href="${item.vanguardUrl}" target="_blank" class="text-amber-600 font-bold hover:underline">Vanguard</a>` : '<span class="text-slate-400">N/A</span>'}
+                <td class="p-2.5 font-mono text-[11px] min-w-[180px]">
+                    ${inlineStockControls} 
+                    <div class="text-[10px] text-slate-400 font-sans mt-0.5">Total: <strong class="text-brand-600">${totalQty}</strong></div>
                 </td>
-                <td class="p-3 text-right space-x-1">
-                    <button data-action="toggle-visibility" data-doc-id="${item.id}" data-current-hidden="${isHidden}" title="${isHidden ? 'Hiden from being issued' : 'Can be issued'}" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 text-slate-600 transition">
-                        <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
-                    </button>
-                    <button data-action="edit-item" data-doc-id="${item.id}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-xs transition">
-                        <i class="fa-solid fa-pen-to-square mr-1"></i>Edit
-                    </button>
+                <!-- Combined Status, Price & Visibility Column -->
+                <td class="p-2.5">
+                    <div class="flex flex-col items-start gap-1">
+                        <div class="flex items-center gap-1.5">
+                            ${statusBadge}
+                            <span class="font-mono text-xs font-bold text-slate-700">$${priceVal.toFixed(2)}</span>
+                        </div>
+                        ${visibilityBadge}
+                    </div>
+                </td>
+                <!-- Streamlined Adjacent Actions Column -->
+                <td class="p-2.5 text-right">
+                    <div class="inline-flex items-center gap-1 justify-end">
+                        ${item.vanguardUrl ? `<a href="${item.vanguardUrl}" target="_blank" class="p-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-amber-600 transition" title="View Vanguard Product"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>` : ''}
+                        
+                        <button data-action="toggle-visibility" data-doc-id="${item.id}" data-current-hidden="${isHidden}" title="${isHidden ? 'Hidden from catalog' : 'Visible in catalog'}" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 text-slate-600 transition">
+                            <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
+                        </button>
+                        
+                        <button data-action="direct-issue-item" data-doc-id="${item.id}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded-lg text-xs transition shadow-sm flex items-center gap-1">
+                            <i class="fa-solid fa-hand-holding-hand text-xs"></i> Issue
+                        </button>
+                        
+                        <button data-action="edit-item" data-doc-id="${item.id}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2 py-1 rounded-lg border border-slate-200 text-xs transition flex items-center gap-1">
+                            <i class="fa-solid fa-pen-to-square text-xs"></i> Edit
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -517,7 +778,6 @@ export function openItemModal(targetDocId = null) {
     const modal = document.getElementById('item-modal');
     if (!modal) return;
 
-    // Reset inline editor view
     document.getElementById('category-inline-editor')?.classList.add('hidden');
     document.getElementById('category-checkboxes-container')?.classList.remove('hidden');
     const labelToggle = document.getElementById('label-cat-edit-toggle');
@@ -537,14 +797,8 @@ export function openItemModal(targetDocId = null) {
 
         renderCategoryCheckboxes(item.categories || [item.category].filter(Boolean));
 
-        const stockMap = item.stock || { "OS": 0 };
-        if (item.isOneSize || (Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS")) {
-            document.getElementById('form-sizes').value = stockMap["OS"] ?? 0;
-        } else {
-            document.getElementById('form-sizes').value = Object.entries(stockMap)
-                .map(([sz, qty]) => `${sz}: ${qty}`)
-                .join(', ');
-        }
+        // Render dynamic size rows
+        renderSizeFormRows(item.stock || { "One Size": 0 });
 
         if (hideCheckbox) hideCheckbox.checked = item.hideFromCatalog === true || item.hideFromCatalog === 'true';
 
@@ -561,6 +815,7 @@ export function openItemModal(targetDocId = null) {
         document.getElementById('form-doc-id').value = '';
         document.getElementById('item-form').reset();
         renderCategoryCheckboxes([]);
+        renderSizeFormRows({ "One Size": 1 });
         if (hideCheckbox) hideCheckbox.checked = false;
         if (imgPreview) imgPreview.classList.add('hidden');
     }
@@ -570,33 +825,7 @@ export function openItemModal(targetDocId = null) {
 
 export function closeItemModal() {
     document.getElementById('item-modal')?.classList.add('hidden');
-}
-
-function parseStockFromInput(inputStr) {
-    if (!inputStr || !inputStr.trim()) return { "OS": 0 };
-
-    const str = inputStr.trim();
-
-    if (/^\d+$/.test(str)) {
-        return { "OS": parseInt(str, 10) };
-    }
-
-    const stockMap = {};
-    const parts = str.split(',');
-
-    parts.forEach(part => {
-        if (part.includes(':')) {
-            const [size, qty] = part.split(':');
-            const cleanSize = size.trim().toUpperCase();
-            const cleanQty = parseInt(qty, 10);
-            if (cleanSize) stockMap[cleanSize] = !isNaN(cleanQty) && cleanQty >= 0 ? cleanQty : 0;
-        } else {
-            const cleanSize = part.trim().toUpperCase();
-            if (cleanSize) stockMap[cleanSize] = 0;
-        }
-    });
-
-    return Object.keys(stockMap).length > 0 ? stockMap : { "OS": 0 };
+    document.getElementById('direct-issue-modal')?.classList.add('hidden');
 }
 
 async function handleItemFormSubmit() {
@@ -611,8 +840,8 @@ async function handleItemFormSubmit() {
         return;
     }
 
-    const stockInputRaw = document.getElementById('form-sizes').value;
-    const stockMap = parseStockFromInput(stockInputRaw);
+    // Read stock directly from dynamic input rows
+    const stockMap = getStockMapFromFormRows();
     const hideCheckbox = document.getElementById('form-hide-from-catalog');
     const selectedCategories = getSelectedCategoriesFromForm();
 
@@ -625,7 +854,7 @@ async function handleItemFormSubmit() {
         stock: stockMap,
         status: 'IN',
         hideFromCatalog: hideCheckbox ? hideCheckbox.checked : false,
-        image: document.getElementById('form-image-path').value || `/images/products/${formattedTag}.jpg`,
+        image: document.getElementById('form-image-path').value || ``,
         vanguardUrl: document.getElementById('form-vanguard-url').value
     };
 
@@ -655,7 +884,7 @@ async function processBulkInventoryImport(itemsArray) {
         if (item.stock && typeof item.stock === 'object') {
             stockMap = item.stock;
         } else {
-            stockMap = { "OS": parseInt(item.qty, 10) || 0 };
+            stockMap = { "One Size": parseInt(item.qty, 10) || 0 };
         }
 
         const payload = {

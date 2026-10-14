@@ -97,8 +97,6 @@ function updateShopStats() {
     const halvedSlots = Math.floor(uniqueSupply.length / 2);
     const halvedStockUnits = Math.floor(remainingStockUnits / 2);
     const halvedStockValue = remainingStockValue / 2;
-    const halvedSavingsIssued = totalSavingsIssued / 2;
-    const halvedIssuedCount = Math.floor(issuedItemCount / 2);
 
     // 4. SAFE DOM UPDATES
     if (totalValEl) totalValEl.textContent = `$${halvedCatalogValue.toFixed(2)}`;
@@ -110,8 +108,8 @@ function updateShopStats() {
     if (inValEl) inValEl.textContent = `$${halvedStockValue.toFixed(2)}`;
 
     // Member Savings (Issued Items)
-    if (outValEl) outValEl.textContent = `$${halvedSavingsIssued.toFixed(2)}`;
-    if (outItemsEl) outItemsEl.textContent = halvedIssuedCount;
+    if (outValEl) outValEl.textContent = `$${totalSavingsIssued.toFixed(2)}`;
+    if (outItemsEl) outItemsEl.textContent = issuedItemCount;
 }
 
 function setupEventListeners() {
@@ -207,9 +205,9 @@ export function renderShopItems() {
     const selectedStatus = document.getElementById('shop-status-filter')?.value || 'IN';
     const selectedSize = document.getElementById('shop-size-filter')?.value || 'ALL';
 
-    const filtered = (AppState.supply || []).filter(item => {
-        // NOTE: We do NOT exclude hidden items here so members can view them in the catalog.
-        
+    const LOW_STOCK_THRESHOLD = 2;
+
+    let filtered = (AppState.supply || []).filter(item => {
         const matchSearch = (item.title || '').toLowerCase().includes(searchTerm) || 
                             (item.locationCode || '').toLowerCase().includes(searchTerm);
 
@@ -222,6 +220,25 @@ export function renderShopItems() {
 
         return matchSearch && matchCat && matchStatus && matchSize;
     });
+
+    // --- STAFF-ONLY SORTING: LOW STOCK ITEMS TO THE TOP ---
+    if (isStaffOrOfficer) {
+        filtered.sort((a, b) => {
+            const stockMapA = a.stock || { "OS": 0 };
+            const stockMapB = b.stock || { "OS": 0 };
+
+            const qtyA = Object.values(stockMapA).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
+            const qtyB = Object.values(stockMapB).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
+
+            const isLowA = (qtyA <= LOW_STOCK_THRESHOLD && a.status === 'IN') ? 1 : 0;
+            const isLowB = (qtyB <= LOW_STOCK_THRESHOLD && b.status === 'IN') ? 1 : 0;
+
+            if (isLowA !== isLowB) {
+                return isLowB - isLowA; // Low stock items first
+            }
+            return (a.title || '').localeCompare(b.title || '');
+        });
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = `
@@ -240,13 +257,14 @@ export function renderShopItems() {
         const rawPrice = parseFloat(item.price) || 0;
         const thumbSrc = item.image && item.image.trim() !== "" ? item.image : CAP_FALLBACK_IMAGE;
 
-        const categoryLabel = Array.isArray(item.categories) && item.categories.length > 0 
-            ? item.categories.join(', ') 
-            : (item.categories || item.category || 'General');
+        const stockMap = item.stock || { "OS": 1 };
+        const totalQty = Object.values(stockMap).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
+        
+        // Staff-only low stock flag
+        const isLowStock = isStaffOrOfficer && isAvailable && totalQty <= LOW_STOCK_THRESHOLD;
 
         const isInCart = (AppState.cart || []).some(c => c.id === item.id);
 
-        const stockMap = item.stock || { "OS": 1 };
         const stockEntries = Object.entries(stockMap);
         const sizeDropdownHtml = stockEntries.length > 0 ? `
             <div class="mt-2">
@@ -261,11 +279,21 @@ export function renderShopItems() {
             </div>
         ` : '';
 
-        // Determine price tag / availability banner
+        // Determine price tag & availability banner
         let priceDisplayHtml = '';
         let badgeHtml = '';
 
-        if (isHidden) {
+        if (isLowStock) {
+            // Staff-specific red low-stock badge
+            badgeHtml = `<span class="absolute top-2 right-2 text-[10px] font-extrabold uppercase px-2 py-1 rounded-full z-10 bg-red-600 text-white shadow-sm animate-pulse flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> Low Supply (${totalQty})</span>`;
+            priceDisplayHtml = `
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-xs text-slate-400 line-through font-semibold">$${rawPrice.toFixed(2)}</span>
+                    <span class="text-base font-extrabold text-brand-600">$0.00</span>
+                    <span class="bg-red-100 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-200">RESTOCK RECOMMENDED</span>
+                </div>
+            `;
+        } else if (isHidden) {
             badgeHtml = `<span class="absolute top-2 right-2 text-[10px] font-bold uppercase px-2 py-1 rounded-full z-10 bg-purple-100 text-purple-900 border border-purple-300 flex items-center gap-1">Squadron</span>`;
             priceDisplayHtml = `
                 <div class="flex items-center gap-2 mt-1">
@@ -329,8 +357,13 @@ export function renderShopItems() {
             `;
         }
 
+        // Apply a soft red background tint and red ring for staff on low stock items
+        const cardStyleClass = isLowStock
+            ? 'bg-red-50/60 border-red-300 ring-1 ring-red-400/50 shadow-sm hover:shadow-md'
+            : (isHidden ? 'opacity-90 bg-slate-50/50 border-slate-200' : 'bg-white border-slate-200 shadow-sm hover:shadow-md');
+
         return `
-            <div data-item-id="${item.id}" class="item-card bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group ${isHidden ? 'opacity-90 bg-slate-50/50' : ''}">
+            <div data-item-id="${item.id}" class="item-card rounded-2xl border transition cursor-pointer overflow-hidden flex flex-col justify-between group ${cardStyleClass}">
                 <div>
                     <div class="relative p-1 flex items-center justify-center border-b border-slate-100 overflow-hidden">
                         <img src="${thumbSrc}" onerror="this.onerror=null; this.src='${CAP_FALLBACK_IMAGE}';" alt="${item.title}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300">
@@ -341,7 +374,6 @@ export function renderShopItems() {
                     </div>
 
                     <div class="p-4 space-y-2">
-                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">${categoryLabel}</div>
                         <h3 class="font-bold text-sm text-slate-900 leading-snug line-clamp-2 group-hover:text-brand-600 transition">${item.title}</h3>
                         <div class="text-xs font-semibold text-slate-500"><i class="fa-solid fa-location-dot text-brand-600 mr-1"></i>${item.location || 'Storage Slot'}</div>
                         

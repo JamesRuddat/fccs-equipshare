@@ -45,6 +45,13 @@
 
     <app-header></app-header>
 
+    <!-- Hidden static form for Netlify build-time parser -->
+    <form name="booster-requisition" netlify netlify-honeypot="bot-field" hidden>
+        <input type="hidden" name="form-name" value="booster-requisition" />
+        <input type="hidden" name="requested_items" />
+        <textarea name="notes"></textarea>
+    </form>
+
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         <!-- STATS & FINANCIAL DASHBOARD -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 no-print">
@@ -136,7 +143,7 @@
                 </div>
             </div>
 
-            <div id="shop-items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+            <div id="shop-items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         </section>
     </main>
 

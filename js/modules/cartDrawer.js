@@ -1,5 +1,6 @@
 // /js/modules/cartDrawer.js - Universal Shopping Cart Drawer Module
 import { AppState, saveCart, showToast } from '/js/state.js';
+import { auth } from '/js/firebase-db.js'; // 1. Added Auth import
 
 /**
  * Renders items inside the cart drawer and updates header/drawer badge counters.
@@ -118,6 +119,24 @@ export function setupCartDrawer() {
             showToast("Cart cleared.");
         } else if (proceedBtn) {
             e.preventDefault();
+
+            // Check if user is authenticated
+            if (!auth.currentUser) {
+                drawer?.classList.add('hidden');
+
+                // Target the embedded auth modal from AppHeader
+                const authModal = document.getElementById('auth-modal');
+                if (authModal) {
+                    authModal.classList.remove('hidden');
+                } else if (typeof window.showAlert === 'function') {
+                    window.showAlert('Sign In Required', 'Please sign in to view your pick list and place supply requests.', 'warning');
+                } else {
+                    showToast('Please sign in to proceed.', 'warning');
+                }
+                return;
+            }
+
+            // Authenticated user path
             drawer?.classList.add('hidden');
             window.location.href = '/pages/order.html';
         }
