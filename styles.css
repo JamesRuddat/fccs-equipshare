@@ -178,6 +178,13 @@ h4 {
 /* ==========================================================================
    3. STICKY HEADER & NAVBAR
    ========================================================================== */
+/* Reserve height for app-header custom element to eliminate layout shift */
+app-header:not(:defined) {
+    display: block;
+    min-height: 64px;
+    background-color: #0f172a; /* bg-slate-900 */
+}
+
 site-header,
 app-header {
     display: block;

@@ -1,4 +1,4 @@
-// /js/shop.js - Shop & Inventory Catalog Module
+// /js/catalog.js - Shop & Inventory Catalog Module
 import { AppState, saveCart, showToast } from '/js/state.js';
 import { initAuth } from '/js/auth.js';
 import { getSupplyItems } from '/js/firebase-db.js';

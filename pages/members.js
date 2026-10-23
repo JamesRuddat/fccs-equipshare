@@ -4,6 +4,7 @@ import { AppState, showToast } from '/js/state.js';
 import { initAuth } from '/js/auth.js';
 import { 
     getSupplyItems, 
+    getAllIssuedEquipment,
     getAllUsers, 
     updateUserRoleInDB 
 } from '/js/firebase-db.js';
@@ -11,32 +12,35 @@ import {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth(async (user) => {
         AppState.currentUser = user;
+        // Dispatch event so AppHeader updates navigation links
+        window.dispatchEvent(new CustomEvent('user-state-changed'));
+        
         await refreshMembersData();
     });
 
     setupTabSwitcher();
     setupMemberModalHandlers();
     setupRoleChangeListeners();
-
-    refreshMembersData();
 });
 
 /* --- DATA SYNCHRONIZATION --- */
 async function refreshMembersData() {
     try {
-        const [supply, users] = await Promise.all([
+        const [supply, issuedItems, users] = await Promise.all([
             getSupplyItems().catch(() => []),
+            getAllIssuedEquipment().catch(() => []),
             getAllUsers().catch(() => [])
         ]);
 
         AppState.supply = supply || [];
+        AppState.issuedItems = issuedItems || [];
         AppState.membersList = users || [];
 
         // Render both views in a single pass
         renderMembersGrid();
         renderUserRolesTable(AppState.membersList);
     } catch (err) {
-        console.error("Error loading members and roles data:", err);
+        console.error("Error loading members, supply, and roles data:", err);
     }
 }
 
@@ -81,26 +85,28 @@ export function renderMembersGrid() {
         return;
     }
 
-    // 1-PASS LOOKUP INDEX: Pre-group supply items by member keys (O(N) time complexity)
+    // 1-PASS LOOKUP INDEX: Pre-group active issues and pending requests by member keys (O(N) time complexity)
     const issuedMap = new Map();
     const requestedMap = new Map();
 
-    (AppState.supply || []).forEach(item => {
-        if (item.status === 'ISSUED') {
-            [item.lastIssuedToUid, (item.lastIssuedToEmail || '').toLowerCase().trim(), item.lastIssuedToName]
-                .filter(Boolean)
-                .forEach(key => {
-                    if (!issuedMap.has(key)) issuedMap.set(key, []);
-                    if (!issuedMap.get(key).includes(item)) issuedMap.get(key).push(item);
-                });
-        } else if (item.status === 'REQUESTED') {
-            [item.requestedByUid, (item.requestedByEmail || '').toLowerCase().trim(), item.requestedByName]
-                .filter(Boolean)
-                .forEach(key => {
-                    if (!requestedMap.has(key)) requestedMap.set(key, []);
-                    if (!requestedMap.get(key).includes(item)) requestedMap.get(key).push(item);
-                });
-        }
+    // Map Active Checkouts from 'issues' collection
+    (AppState.issuedItems || []).forEach(issue => {
+        [issue.issuedToUid, (issue.issuedToEmail || '').toLowerCase().trim(), issue.issuedToName]
+            .filter(Boolean)
+            .forEach(key => {
+                if (!issuedMap.has(key)) issuedMap.set(key, []);
+                if (!issuedMap.get(key).includes(issue)) issuedMap.get(key).push(issue);
+            });
+    });
+
+    // Map Pending Requests from 'supply' collection
+    (AppState.supply || []).filter(i => i.status === 'REQUESTED').forEach(item => {
+        [item.requestedByUid, (item.requestedByEmail || '').toLowerCase().trim(), item.requestedByName]
+            .filter(Boolean)
+            .forEach(key => {
+                if (!requestedMap.has(key)) requestedMap.set(key, []);
+                if (!requestedMap.get(key).includes(item)) requestedMap.get(key).push(item);
+            });
     });
 
     // RENDER GRID FROM PRE-INDEXED LOOKUP MAPS
@@ -109,7 +115,7 @@ export function renderMembersGrid() {
         const memberName = member.fullName || '';
         const memberUid = member.uid || member.id;
 
-        // O(1) Map Lookups instead of O(N) array filtering
+        // O(1) Map Lookups
         const issuedItems = issuedMap.get(memberUid) || issuedMap.get(memberEmail) || issuedMap.get(memberName) || [];
         const requestedItems = requestedMap.get(memberUid) || requestedMap.get(memberEmail) || requestedMap.get(memberName) || [];
 
@@ -118,8 +124,8 @@ export function renderMembersGrid() {
         const issuedItemsHtml = issuedItems.length > 0 ? issuedItems.map(item => `
             <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100">
                 <div class="truncate pr-2">
-                    <span class="font-mono font-bold text-slate-900 mr-1">[${item.locationCode || 'N/A'}]</span>
                     <span class="text-slate-700 font-medium">${item.title}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">(${item.size || 'OS'})</span>
                 </div>
                 <span class="font-mono text-slate-500 font-semibold">$${(parseFloat(item.price) || 0).toFixed(2)}</span>
             </div>
@@ -128,10 +134,9 @@ export function renderMembersGrid() {
         const requestedItemsHtml = requestedItems.length > 0 ? requestedItems.map(item => `
             <div class="flex items-center justify-between text-xs py-1 border-b border-amber-100/60 bg-amber-50/50 px-2 rounded">
                 <div class="truncate pr-2">
-                    <span class="font-mono font-bold text-amber-800 mr-1">[${item.locationCode || 'N/A'}]</span>
                     <span class="text-amber-900 font-medium">${item.title}</span>
                 </div>
-                <span class="text-[10px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Pending</span>
+                <span class="text-[10px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Pending Pickup</span>
             </div>
         `).join('') : '';
 
@@ -178,11 +183,11 @@ export function renderMembersGrid() {
 
                 <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between mt-2">
                     <div>
-                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Property On Loan</div>
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">On Loan</div>
                         <div class="text-xs font-extrabold text-slate-800">${issuedItems.length} Items</div>
                     </div>
                     <div class="text-right">
-                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Replacement Liability</div>
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Replacement Liability</div>
                         <div class="text-sm font-extrabold ${totalValueOwed > 0 ? 'text-amber-600' : 'text-slate-600'}">
                             $${totalValueOwed.toFixed(2)}
                         </div>

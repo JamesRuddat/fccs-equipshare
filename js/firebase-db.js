@@ -1,4 +1,4 @@
-// /js/firebase-db.js - Clean Data Access Layer with Workflow & Size Support
+// /js/firebase-db.js - Clean Data Access Layer with Dual-List Inventory & Issue Tracking
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
     getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc,
@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    onAuthStateChanged, signOut
+    sendPasswordResetEmail, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -26,6 +26,7 @@ export const db = getFirestore(app);
 
 const supplyRef = collection(db, "supply");
 const usersRef = collection(db, "users");
+const issuesRef = collection(db, "issues");
 
 // Helper to convert array/string input to a clean string array
 const parseArray = (input) => {
@@ -38,7 +39,6 @@ const parseArray = (input) => {
 
 /**
  * Helper to normalize stock object input.
- * Accepts either a stock object { "S": 5, "M": 10 } or numeric total for one-size items.
  * Output: { [sizeLabel]: quantityNumber }
  */
 const parseStock = (stockInput, defaultQuantity = 1) => {
@@ -66,11 +66,11 @@ export const getTotalQuantity = (stockMap) => {
 };
 
 /* ==========================================================================
-   SUPPLY / INVENTORY CRUD & WORKFLOW
+   LIST 1: SUPPLY / INVENTORY MANAGEMENT (`supply` collection)
    ========================================================================== */
 
 /**
- * CREATE: Adds a clean supply item document with stock per size.
+ * CREATE: Adds a new inventory item to the supply closet.
  */
 export async function createSupplyItem(itemData) {
     const stockMap = parseStock(itemData.stock, itemData.quantity || 1);
@@ -87,8 +87,8 @@ export async function createSupplyItem(itemData) {
         sizes: Object.keys(stockMap),
         stock: stockMap,
         isOneSize: Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS",
-        status: initialStatus, // Options: "IN", "REQUESTED", "ISSUED", "VANGUARD", "OUT"
-        hideFromCatalog: !!itemData.hideFromCatalog, // Stores true for squadron-owned/hidden items
+        status: initialStatus,
+        hideFromCatalog: !!itemData.hideFromCatalog,
         vanguardUrl: itemData.vanguardUrl || "",
         image: itemData.image || "",
         createdAt: serverTimestamp()
@@ -98,7 +98,7 @@ export async function createSupplyItem(itemData) {
 }
 
 /**
- * READ ALL: Fetches all supply items.
+ * READ ALL SUPPLY: Fetches all inventory items from closet stock.
  */
 export async function getSupplyItems() {
     const snapshot = await getDocs(supplyRef);
@@ -115,7 +115,7 @@ export async function getSupplyItems() {
 }
 
 /**
- * UPDATE: Updates specific fields or stock map on a supply item document.
+ * UPDATE: Updates specific metadata or stock maps on an inventory item.
  */
 export async function updateSupplyItem(itemId, updatedData) {
     const itemRef = doc(db, "supply", itemId);
@@ -136,7 +136,6 @@ export async function updateSupplyItem(itemId, updatedData) {
         cleanPayload.sizes = Object.keys(stockMap);
         cleanPayload.isOneSize = Object.keys(stockMap).length === 1 && Object.keys(stockMap)[0] === "OS";
 
-        // Preserve VANGUARD or active workflow status if already set
         if (!cleanPayload.status) {
             const totalQty = getTotalQuantity(stockMap);
             cleanPayload.status = totalQty > 0 ? "IN" : "OUT";
@@ -149,13 +148,27 @@ export async function updateSupplyItem(itemId, updatedData) {
 }
 
 /**
- * DIRECT ISSUE: Supply Officer directly assigns an available item to a member.
+ * DELETE: Hard-deletes an inventory item document.
+ */
+export async function deleteSupplyItem(itemId) {
+    await deleteDoc(doc(db, "supply", itemId));
+}
+
+/* ==========================================================================
+   LIST 2: ISSUED EQUIPMENT LEDGER (`issues` collection)
+   ========================================================================== */
+
+/**
+ * DIRECT ISSUE:
+ * 1. Decrements 1 unit of target size in supply closet (`supply` collection).
+ * 2. Status stays "IN" unless remaining stock across all sizes hits 0.
+ * 3. Creates a separate checkout record in the `issues` collection.
  */
 export async function issueSupplyItemToMember(itemId, memberData, selectedSize = "OS") {
     const itemRef = doc(db, "supply", itemId);
     const itemDoc = await getDoc(itemRef);
 
-    if (!itemDoc.exists()) throw new Error("Item does not exist.");
+    if (!itemDoc.exists()) throw new Error("Supply item does not exist.");
 
     const itemData = itemDoc.data();
     const stockMap = { ...(itemData.stock || { "OS": 1 }) };
@@ -163,28 +176,134 @@ export async function issueSupplyItemToMember(itemId, memberData, selectedSize =
 
     const currentQty = parseInt(stockMap[targetSize] || 0, 10);
     if (currentQty <= 0) {
-        throw new Error(`Size "${targetSize}" is out of supply for "${itemData.title}".`);
+        throw new Error(`Size "${targetSize}" is currently out of stock for "${itemData.title}".`);
     }
 
-    // Deduct stock for the issued item
+    // 1. Deduct 1 unit from specified size
     stockMap[targetSize] = currentQty - 1;
-
-    // Check if remaining stock across all sizes is 0
     const totalRemaining = getTotalQuantity(stockMap);
-    const newStatus = totalRemaining > 0 ? "IN" : "OUT";
+
+    // 2. Status remains "IN" as long as total remaining stock > 0
+    let updatedStatus = "IN";
+    if (itemData.status === "VANGUARD") {
+        updatedStatus = "VANGUARD";
+    } else if (totalRemaining === 0) {
+        updatedStatus = "OUT";
+    }
 
     await updateDoc(itemRef, {
         stock: stockMap,
-        status: itemData.status === "VANGUARD" ? "VANGUARD" : newStatus,
-        lastIssuedToUid: memberData.uid || null,
-        lastIssuedToEmail: memberData.email ? memberData.email.toLowerCase().trim() : null,
-        lastIssuedToName: memberData.fullName || memberData.displayName || "Member",
+        status: updatedStatus,
+        lastIssuedToUid: memberData?.uid || null,
+        lastIssuedToEmail: memberData?.email ? memberData.email.toLowerCase().trim() : null,
+        lastIssuedToName: memberData?.fullName || memberData?.displayName || "Unassigned Member",
         lastIssuedDate: serverTimestamp()
     });
+
+    // 3. Log explicit checkout entry in the 'issues' collection
+    try {
+        await addDoc(issuesRef, {
+            supplyItemId: itemId,
+            locationCode: itemData.locationCode || "",
+            title: itemData.title || "Untitled Item",
+            size: targetSize,
+            price: itemData.price || 0,
+            issuedToUid: memberData?.uid || null,
+            issuedToEmail: memberData?.email ? memberData.email.toLowerCase().trim() : null,
+            issuedToName: memberData?.fullName || memberData?.displayName || "Unassigned / General Unit",
+            status: "ISSUED",
+            issuedAt: serverTimestamp()
+        });
+    } catch (err) {
+        console.warn("Could not log issue record (Check Firestore Rules for 'issues'):", err);
+    }
 }
 
 /**
- * MEMBER REQUESTS ITEM: Sets status to "REQUESTED" (Order placed on order.html, pending pickup)
+ * READ ALL ISSUED PROPERTY: Fetches active checkout records from the `issues` collection.
+ */
+export async function getAllIssuedEquipment() {
+    try {
+        const q = query(issuesRef, where("status", "==", "ISSUED"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+        console.warn("Error fetching issued equipment list:", err);
+        return [];
+    }
+}
+
+/**
+ * READ MEMBER ISSUED EQUIPMENT: Fetches active items issued to a specific member.
+ */
+export async function getIssuedItemsForMember(userUid, userEmail = '') {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    const issuedItems = [];
+
+    try {
+        const qUid = query(issuesRef, where("issuedToUid", "==", userUid), where("status", "==", "ISSUED"));
+        const snapUid = await getDocs(qUid);
+        snapUid.docs.forEach(d => issuedItems.push({ id: d.id, ...d.data() }));
+
+        if (issuedItems.length === 0 && cleanEmail) {
+            const qEmail = query(issuesRef, where("issuedToEmail", "==", cleanEmail), where("status", "==", "ISSUED"));
+            const snapEmail = await getDocs(qEmail);
+            snapEmail.docs.forEach(d => issuedItems.push({ id: d.id, ...d.data() }));
+        }
+    } catch (err) {
+        console.warn("Error querying 'issues' collection for member:", err);
+    }
+
+    return issuedItems;
+}
+
+/**
+ * CHECK-IN ITEM: 
+ * Returns gear from a member back to available closet stock.
+ * 1. Increments target size stock in `supply`.
+ * 2. Marks the `issues` ledger document as "RETURNED".
+ */
+export async function checkinSupplyItem(issueRecordId, itemId, returnedSize = "OS") {
+    // 1. Close out issue record in `issues`
+    if (issueRecordId) {
+        try {
+            const issueDocRef = doc(db, "issues", issueRecordId);
+            await updateDoc(issueDocRef, {
+                status: "RETURNED",
+                returnedAt: serverTimestamp()
+            });
+        } catch (err) {
+            console.warn("Could not update issue ledger entry:", err);
+        }
+    }
+
+    // 2. Restore 1 unit to target size in `supply`
+    if (itemId) {
+        const itemRef = doc(db, "supply", itemId);
+        const itemDoc = await getDoc(itemRef);
+
+        if (itemDoc.exists()) {
+            const itemData = itemDoc.data();
+            const stockMap = { ...(itemData.stock || { "OS": 0 }) };
+            const targetSize = (returnedSize || "OS").toUpperCase().trim();
+
+            const currentQty = parseInt(stockMap[targetSize] || 0, 10);
+            stockMap[targetSize] = currentQty + 1;
+
+            await updateDoc(itemRef, {
+                stock: stockMap,
+                status: itemData.status === "VANGUARD" ? "VANGUARD" : "IN"
+            });
+        }
+    }
+}
+
+/* ==========================================================================
+   ORDER REQUEST WORKFLOW (Pending Requests before Handout)
+   ========================================================================== */
+
+/**
+ * MEMBER REQUESTS ITEM: Reserves stock and creates pending request state on item.
  */
 export async function requestSupplyItem(itemId, memberData, selectedSize = "OS") {
     const itemRef = doc(db, "supply", itemId);
@@ -198,10 +317,9 @@ export async function requestSupplyItem(itemId, memberData, selectedSize = "OS")
 
     const currentQty = parseInt(stockMap[targetSize] || 0, 10);
     if (currentQty <= 0) {
-        throw new Error(`Size "${targetSize}" is out of supply for "${itemData.title}".`);
+        throw new Error(`Size "${targetSize}" is out of stock for "${itemData.title}".`);
     }
 
-    // Reserve stock quantity for this request
     stockMap[targetSize] = currentQty - 1;
 
     await updateDoc(itemRef, {
@@ -217,7 +335,7 @@ export async function requestSupplyItem(itemId, memberData, selectedSize = "OS")
 }
 
 /**
- * OFFICER ISSUES ITEM: Supply Officer confirms physical handover and marks status as "ISSUED"
+ * CONFIRM PENDING REQUEST: Handout pending request and log to `issues` ledger.
  */
 export async function issueSupplyItem(itemId) {
     const itemRef = doc(db, "supply", itemId);
@@ -226,48 +344,43 @@ export async function issueSupplyItem(itemId) {
     if (!itemDoc.exists()) throw new Error("Item does not exist.");
 
     const itemData = itemDoc.data();
+    const totalRemaining = getTotalQuantity(itemData.stock || {});
 
+    // Clear pending request status on main item
     await updateDoc(itemRef, {
-        status: "ISSUED",
-        lastIssuedToUid: itemData.requestedByUid || itemData.lastIssuedToUid || null,
-        lastIssuedToEmail: itemData.requestedByEmail || itemData.lastIssuedToEmail || null,
-        lastIssuedToName: itemData.requestedByName || itemData.lastIssuedToName || "Member",
+        status: totalRemaining > 0 ? "IN" : "OUT",
+        lastIssuedToUid: itemData.requestedByUid || null,
+        lastIssuedToEmail: itemData.requestedByEmail || null,
+        lastIssuedToName: itemData.requestedByName || "Member",
         lastIssuedDate: serverTimestamp(),
-        // Clear pending request metadata
         requestedByUid: null,
         requestedByEmail: null,
         requestedByName: null,
-        requestedPhone: null
+        requestedPhone: null,
+        requestedSize: null,
+        requestedAt: null
     });
+
+    // Log to `issues` ledger
+    try {
+        await addDoc(issuesRef, {
+            supplyItemId: itemId,
+            locationCode: itemData.locationCode || "",
+            title: itemData.title || "Untitled Item",
+            size: itemData.requestedSize || "OS",
+            issuedToUid: itemData.requestedByUid || null,
+            issuedToEmail: itemData.requestedByEmail || null,
+            issuedToName: itemData.requestedByName || "Member",
+            status: "ISSUED",
+            issuedAt: serverTimestamp()
+        });
+    } catch (err) {
+        console.warn("Could not log to 'issues' collection:", err);
+    }
 }
 
 /**
- * CHECKIN ITEM: Resets an issued or requested item back to available closet stock.
- */
-export async function checkinSupplyItem(itemId, returnedSize = "OS") {
-    const itemRef = doc(db, "supply", itemId);
-    const itemDoc = await getDoc(itemRef);
-
-    if (!itemDoc.exists()) throw new Error("Item does not exist.");
-
-    const itemData = itemDoc.data();
-    const stockMap = { ...(itemData.stock || { "OS": 0 }) };
-    const targetSize = (returnedSize || "OS").toUpperCase().trim();
-
-    const currentQty = parseInt(stockMap[targetSize] || 0, 10);
-    stockMap[targetSize] = currentQty + 1;
-
-    await updateDoc(itemRef, {
-        stock: stockMap,
-        status: "IN",
-        requestedByUid: null,
-        requestedByEmail: null,
-        requestedByName: null
-    });
-}
-
-/**
- * SET VANGUARD STATUS: Flag catalog items that are not physically stocked in unit supply
+ * SET VANGUARD STATUS
  */
 export async function setAsVanguardItem(itemId, vanguardUrl) {
     const itemRef = doc(db, "supply", itemId);
@@ -278,15 +391,8 @@ export async function setAsVanguardItem(itemId, vanguardUrl) {
     });
 }
 
-/**
- * DELETE: Hard-deletes a supply document.
- */
-export async function deleteSupplyItem(itemId) {
-    await deleteDoc(doc(db, "supply", itemId));
-}
-
 /* ==========================================================================
-   USER MANAGEMENT & ACCOUNT LINKING
+   USER ACCOUNT & ROLE MANAGEMENT
    ========================================================================== */
 
 export async function registerUserAccount(email, password, fullName, phone) {
@@ -327,6 +433,59 @@ export async function registerUserAccount(email, password, fullName, phone) {
     }
 
     return user;
+}
+
+export async function resetUserPassword(email) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) throw new Error("Please enter a valid email address.");
+    await sendPasswordResetEmail(auth, cleanEmail);
+}
+
+export async function correctUserEmail(identifier, password, newEmail) {
+    const cleanIdentifier = (identifier || '').trim();
+    const cleanNewEmail = (newEmail || '').trim().toLowerCase();
+    const cleanPhone = cleanIdentifier.replace(/\D/g, '');
+
+    if (!cleanIdentifier || !password || !cleanNewEmail) {
+        throw new Error("All fields are required.");
+    }
+
+    const snapshot = await getDocs(usersRef);
+    const matchingDoc = snapshot.docs.find(d => {
+        const data = d.data();
+        const nameMatch = data.fullName && data.fullName.toLowerCase() === cleanIdentifier.toLowerCase();
+        const userCleanPhone = (data.phone || '').replace(/\D/g, '');
+        const phoneMatch = cleanPhone.length >= 7 && userCleanPhone === cleanPhone;
+        return nameMatch || phoneMatch;
+    });
+
+    if (!matchingDoc) {
+        throw new Error("No account found matching that name or phone number.");
+    }
+
+    const userData = matchingDoc.data();
+    const oldEmail = userData.email;
+
+    let userCredential;
+    try {
+        userCredential = await signInWithEmailAndPassword(auth, oldEmail, password);
+    } catch (err) {
+        throw new Error("Incorrect password for this account.");
+    }
+
+    const newCredential = await createUserWithEmailAndPassword(auth, cleanNewEmail, password);
+    const newUid = newCredential.user.uid;
+
+    await setDoc(doc(db, "users", newUid), {
+        ...userData,
+        uid: newUid,
+        email: cleanNewEmail,
+        updatedAt: serverTimestamp()
+    });
+
+    await deleteDoc(doc(db, "users", matchingDoc.id));
+
+    return cleanNewEmail;
 }
 
 export function loginUserAccount(email, password) {

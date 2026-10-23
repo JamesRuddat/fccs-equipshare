@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquipShare | Profile & Issued Property</title>
+    <link rel="icon" type="image/x-icon" href="/assets/Awesome-Boxes-Packing.svg">
+
+    <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        barcode: ['"Libre Barcode 39 Text"', 'cursive'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f4f6f0',
+                            100: '#e3e8d9',
+                            500: '#65a30d', // tactical lime
+                            600: '#4d7c0f', // ranger green primary
+                            700: '#3f6212', // dark olive
+                            900: '#1a2e05'  // deep army green
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Barcode+39+Text&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+
+    <script type="module" src="/js/components.js"></script>
+</head>
+
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+<app-header class="block min-h-[64px]"></app-header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Header & Profile Info Bar -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-14 h-14 rounded-2xl bg-brand-600 text-white flex items-center justify-center font-extrabold text-xl shadow-md uppercase">
+                    <span id="user-avatar-initials">--</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 id="user-display-name" class="text-2xl font-extrabold text-slate-900">Loading Profile...</h2>
+                        <span id="user-role-badge"
+                            class="bg-brand-100 text-brand-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full capitalize">
+                            Member
+                        </span>
+                    </div>
+                    <p id="user-display-email" class="text-slate-500 text-xs mt-0.5">member@squadron.org</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <button id="btn-open-edit-profile"
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-user-pen text-slate-600"></i> Edit Profile
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Left Column: Account Details Widget -->
+            <div class="space-y-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-address-card text-brand-600"></i> Account Information
+                    </h3>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Full Name:</span>
+                            <span id="info-full-name" class="font-bold text-slate-900">--</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Phone Number:</span>
+                            <span id="info-phone" class="font-mono font-bold text-slate-900">Not Provided</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                            <span class="text-slate-500 font-medium">Email Address:</span>
+                            <span id="info-email" class="font-bold text-slate-900">--</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-slate-500 font-medium">Account Role:</span>
+                            <span id="info-role" class="font-bold text-brand-600 capitalize">Member</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Status Card -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Liabilities</span>
+                        <span id="total-issued-count"
+                            class="bg-indigo-100 text-indigo-800 text-xs font-extrabold px-2.5 py-1 rounded-lg">
+                            0 Items Issued
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Issued Equipment & Pending Requests -->
+            <div class="lg:col-span-2 space-y-6">
+
+                <!-- Issued Property Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <h3 id="issued-equipment-count" class="font-bold text-slate-800 text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-packing text-brand-600"></i> Issued Equipment (0)
+                        </h3>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                                    <th class="p-3">Tag Code</th>
+                                    <th class="p-3">Item Title</th>
+                                    <th class="p-3">Size</th>
+                                    <th class="p-3">Issued Date</th>
+                                    <th class="p-3 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="issued-equipment-list" class="divide-y divide-slate-100 font-medium">
+                                <tr>
+                                    <td colspan="5" class="p-6 text-center text-slate-400">Loading issued equipment...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pending Requests Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <h3 id="pending-requests-count" class="font-bold text-slate-800 text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> Pending Requests (0)
+                        </h3>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                                    <th class="p-3">Tag Code</th>
+                                    <th class="p-3">Item Title</th>
+                                    <th class="p-3">Requested Size</th>
+                                    <th class="p-3 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pending-requests-list" class="divide-y divide-slate-100 font-medium">
+                                <tr>
+                                    <td colspan="4" class="p-6 text-center text-slate-400">No pending equipment requests.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- EDIT PROFILE MODAL -->
+    <div id="edit-profile-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden text-xs">
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-sm">Edit Profile Information</h3>
+                <button type="button" id="btn-close-edit-profile" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="edit-profile-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+                    <input type="text" id="edit-full-name" required
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Phone Number</label>
+                    <input type="tel" id="edit-phone" placeholder="(555) 000-0000"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" id="btn-cancel-edit-profile"
+                        class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-bold shadow-sm transition">
+                        Save Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <app-footer></app-footer>
+    <script type="module" src="/pages/profile.js"></script>
+</body>
+
+</html>

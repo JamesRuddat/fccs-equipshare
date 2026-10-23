@@ -9,11 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth((user) => {
         // Pre-fill user information if signed in
         if (user) {
+            AppState.currentUser = user;
             const nameEl = document.getElementById('officer-member-name');
             const emailEl = document.getElementById('officer-member-email');
             const phoneEl = document.getElementById('officer-member-phone');
 
-            if (nameEl && !nameEl.value) nameEl.value = user.fullName || '';
+            if (nameEl && !nameEl.value) nameEl.value = user.fullName || user.displayName || '';
             if (emailEl && !emailEl.value) emailEl.value = user.email || '';
             if (phoneEl && !phoneEl.value) phoneEl.value = user.phone || '';
         }
@@ -160,47 +161,68 @@ async function finalizeCheckout() {
     const name = document.getElementById('officer-member-name')?.value?.trim();
     const phone = document.getElementById('officer-member-phone')?.value?.trim();
     const email = document.getElementById('officer-member-email')?.value?.trim();
+    const checkoutBtn = document.getElementById('btn-checkout');
 
     if (!name || !email) {
-        window.showAlert("Missing fields", "Please provide member Full Name and Email.", "error");
+        if (window.showAlert) {
+            window.showAlert("Missing fields", "Please provide member Full Name and Email.", "error");
+        } else {
+            alert("Please provide member Full Name and Email.");
+        }
         return;
     }
 
     if (!AppState.cart || AppState.cart.length === 0) {
-        window.showAlert("Cart is empty", "Add items before checking out.", "error");
+        if (window.showAlert) {
+            window.showAlert("Cart is empty", "Add items before checking out.", "error");
+        } else {
+            alert("Cart is empty. Add items before checking out.");
+        }
         return;
     }
 
     const memberData = {
+        uid: AppState.currentUser?.uid || null,
         fullName: name,
         email: email,
         phone: phone || ''
     };
 
     try {
-        const checkoutPromises = [];
+        if (checkoutBtn) {
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Processing Order...`;
+        }
 
-        AppState.cart.forEach(item => {
+        // Process cart items sequentially to avoid Firestore write conflicts on the same document
+        for (const item of AppState.cart) {
+            const itemId = item.id || item.docId;
             const qty = parseInt(item.quantity, 10) || 1;
             const size = item.selectedSize || 'OS';
 
             for (let i = 0; i < qty; i++) {
-                // Call requestSupplyItem instead of checkoutSupplyItem
-                checkoutPromises.push(requestSupplyItem(item.id, memberData, size));
+                await requestSupplyItem(itemId, memberData, size);
             }
-        });
-
-        await Promise.all(checkoutPromises);
+        }
 
         // Clear cart and notify components
         AppState.cart = [];
         saveCart();
         window.dispatchEvent(new CustomEvent('cart-updated'));
-        
+
         showToast("Equipment requested for " + name);
         window.location.href = '/pages/confirmation.html';
     } catch (err) {
         console.error("Checkout error:", err);
-        window.showAlert("Failed to complete request", err.message, "error");
+        if (window.showAlert) {
+            window.showAlert("Failed to complete request", err.message, "error");
+        } else {
+            alert(`Failed to complete request: ${err.message}`);
+        }
+    } finally {
+        if (checkoutBtn) {
+            checkoutBtn.disabled = false;
+            checkoutBtn.innerHTML = `Submit Request & Checkout`;
+        }
     }
 }

@@ -19,8 +19,14 @@ const DEFAULT_CATEGORIES = ["ABU", "OCP", "Blues", "Insignia", "Outerwear", "Hea
 let activeDirectIssueItemId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Wrap page initialization inside initAuth to prevent race conditions:
     initAuth(async (user) => {
         AppState.currentUser = user;
+        
+        // Dispatch event so AppHeader updates its navigation links
+        window.dispatchEvent(new CustomEvent('user-state-changed'));
+
+        // Load supply data after auth completes
         await refreshSupplyData();
     });
 
@@ -29,8 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupInlineCategoryEditor();
     setupDirectIssueForm();
     setupSizeManagerEvents();
-
-    refreshSupplyData();
 });
 
 /* --- DATA NORMALIZATION & VALIDATION --- */
@@ -61,7 +65,7 @@ async function refreshSupplyData() {
     }
 }
 
-/* --- DYNAMIC SIZE MANAGER UI LOGIC (COMPACT FOOTPRINT) --- */
+/* --- DYNAMIC SIZE MANAGER UI LOGIC --- */
 function renderSizeFormRows(stockMap = { "One Size": 0 }, mergeWithExisting = false) {
     const container = document.getElementById('size-rows-container');
     if (!container) return;
@@ -71,13 +75,10 @@ function renderSizeFormRows(stockMap = { "One Size": 0 }, mergeWithExisting = fa
     // If merging, preserve existing quantities for matching sizes
     if (mergeWithExisting) {
         const currentMap = getStockMapFromFormRows();
-        
-        // Merge existing keys with new preset keys
         const mergedKeys = new Set([...Object.keys(currentMap), ...Object.keys(stockMap)]);
         targetStockMap = {};
 
         mergedKeys.forEach(sz => {
-            // Keep existing quantity if present; otherwise use the preset default
             targetStockMap[sz] = currentMap[sz] !== undefined ? currentMap[sz] : (stockMap[sz] || 0);
         });
     }
@@ -141,12 +142,11 @@ function setupSizeManagerEvents() {
         renderSizeFormRows(currentStock);
     });
 
-    // Preset Size Buttons (merges with existing sizes)
+    // Preset Size Buttons
     document.getElementById('preset-s-m-l')?.addEventListener('click', () => {
         renderSizeFormRows({ "X-Small": 0, "Small": 0, "Medium": 0, "Large": 0, "XL": 0 }, true);
     });
 
-    // 1. Hat Sizes Preset
     document.getElementById('preset-hats')?.addEventListener('click', () => {
         const hatMap = {
             "6": 0, "6 3/8": 0, "6 1/2": 0, "6 5/8": 0, "6 3/4": 0, 
@@ -156,7 +156,6 @@ function setupSizeManagerEvents() {
         renderSizeFormRows(hatMap, true);
     });
 
-    // 2. OCP / ABU Garment Sizes Preset (Chest/Length)
     document.getElementById('preset-ocp')?.addEventListener('click', () => {
         const ocpMap = {
             "Extra Small - Regular": 0, "Small - Regular": 0, "Small - Short": 0, "Small - Long": 0, 
@@ -167,7 +166,6 @@ function setupSizeManagerEvents() {
         renderSizeFormRows(ocpMap, true);
     });
 
-    // 3. Female Uniform Sizes Preset (Even numeric sizes)
     document.getElementById('preset-female')?.addEventListener('click', () => {
         const femaleMap = {
             "2R": 0, "4R": 0, "6R": 0, "8R": 0, 
@@ -176,7 +174,6 @@ function setupSizeManagerEvents() {
         renderSizeFormRows(femaleMap, true);
     });
 
-    // 4. Male Dress Shirt Sizes Preset (Neck/Sleeve)
     document.getElementById('preset-dress-shirts')?.addEventListener('click', () => {
         const shirtMap = {
             "14.5 / 32-33": 0, "15 / 32-33": 0, "15.5 / 32-33": 0, "15.5 / 34-35": 0,
@@ -184,7 +181,6 @@ function setupSizeManagerEvents() {
         };
         renderSizeFormRows(shirtMap, true);
     });
-
 }
 
 /* --- CATEGORY MULTI-SELECT & INLINE EDITOR LOGIC --- */
@@ -422,7 +418,7 @@ function setupAdminFilters() {
             try {
                 await issueSupplyItem(docId);
                 await refreshSupplyData();
-                showToast("Item marked as ISSUED and handed out!");
+                showToast("Item marked as ISSUED and logged to issues ledger!");
             } catch (err) {
                 if (window.showAlert) {
                     window.showAlert("Failed to issue item", err.message, "error");
@@ -434,7 +430,7 @@ function setupAdminFilters() {
 
             if (confirm("Are you sure you want to cancel and delete this order request?")) {
                 try {
-                    const item = (AppState.supply || []).find(i => i.id === docId);
+                    const item = (AppState.supply || []).find(i => (i.id || i.docId) === docId);
                     if (item) {
                         const stockMap = { ...(item.stock || { "One Size": 0 }) };
                         const currentQty = parseInt(stockMap[requestedSize] || 0, 10);
@@ -509,14 +505,25 @@ function setupAdminFilters() {
 
 /* --- DIRECT ISSUE MODAL CONTROLLERS --- */
 export async function openDirectIssueModal(itemId) {
+    if (!itemId || itemId === 'undefined') {
+        console.error("Direct Issue failed: Invalid or missing Item ID.");
+        if (window.showAlert) window.showAlert("Issue Error", "Could not locate the document ID for this item.", "error");
+        return;
+    }
+
     activeDirectIssueItemId = itemId;
     const modal = document.getElementById('direct-issue-modal');
     const memberSelect = document.getElementById('direct-issue-member-select');
     const sizeSelect = document.getElementById('direct-issue-size-select');
     const titleEl = document.getElementById('direct-issue-item-title');
-    const item = (AppState.supply || []).find(i => i.id === itemId);
 
-    if (!item || !modal) return;
+    // Find target item across AppState safely
+    const item = (AppState.supply || []).find(i => (i.id || i.docId) === itemId);
+
+    if (!item || !modal) {
+        console.error(`Direct Issue failed: Item with ID ${itemId} not found in state.`);
+        return;
+    }
 
     if (titleEl) {
         titleEl.textContent = `${item.title || 'Untitled Item'} (${item.locationCode || 'N/A'})`;
@@ -532,22 +539,38 @@ export async function openDirectIssueModal(itemId) {
     try {
         const users = await getAllUsers();
         if (memberSelect) {
-            memberSelect.innerHTML = `<option value="">-- Select Member --</option>` + 
-                users.map(u => {
-                    const displayName = u.fullName || u.email || 'Unnamed Member';
-                    return `<option value="${u.id}" data-name="${displayName}" data-email="${u.email || ''}">${displayName}</option>`;
-                }).join('');
+            if (!users || users.length === 0) {
+                memberSelect.innerHTML = `<option value="">No members found</option>`;
+            } else {
+                memberSelect.innerHTML = `<option value="">-- Select Member --</option>` + 
+                    users.map(u => {
+                        const displayName = u.fullName || u.email || 'Unnamed Member';
+                        const uId = u.id || u.uid;
+                        return `<option value="${uId}" data-name="${displayName}" data-email="${u.email || ''}">${displayName}</option>`;
+                    }).join('');
+            }
         }
     } catch (err) {
         console.error("Failed to fetch member directory:", err);
+        if (memberSelect) {
+            memberSelect.innerHTML = `<option value="">Error loading members</option>`;
+        }
     }
 
     modal.classList.remove('hidden');
 }
 
 function setupDirectIssueForm() {
+    const modal = document.getElementById('direct-issue-modal');
+
     document.getElementById('btn-close-direct-issue-modal')?.addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-direct-issue-modal')?.addEventListener('click', closeItemModal);
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeItemModal();
+        });
+    }
 
     const directIssueForm = document.getElementById('direct-issue-form');
     if (directIssueForm) {
@@ -558,6 +581,7 @@ function setupDirectIssueForm() {
             const memberSelect = document.getElementById('direct-issue-member-select');
             const selectedOption = memberSelect.options[memberSelect.selectedIndex];
             const sizeSelect = document.getElementById('direct-issue-size-select');
+            const submitBtn = document.getElementById('btn-submit-direct-issue');
 
             if (!memberSelect.value) {
                 if (window.showAlert) window.showAlert("Select Member", "Please select a member to receive gear.", "error");
@@ -571,6 +595,11 @@ function setupDirectIssueForm() {
             };
 
             try {
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Issuing...`;
+                }
+
                 await issueSupplyItemToMember(activeDirectIssueItemId, memberData, sizeSelect.value);
                 closeItemModal();
                 await refreshSupplyData();
@@ -578,6 +607,11 @@ function setupDirectIssueForm() {
             } catch (err) {
                 console.error("Direct issue error:", err);
                 if (window.showAlert) window.showAlert("Issue Failed", err.message, "error");
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fa-solid fa-check text-xs"></i> Confirm & Issue Gear`;
+                }
             }
         });
     }
@@ -633,27 +667,30 @@ function renderPendingOrdersQueue() {
         return;
     }
 
-    container.innerHTML = pending.map(item => `
-        <tr class="border-b border-slate-100 hover:bg-amber-50/50 transition">
-            <td class="p-2 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
-            <td class="p-2 font-semibold text-slate-800">${item.title}</td>
-            <td class="p-2 text-slate-700">${item.requestedByName || 'Member'}</td>
-            <td class="p-2 font-mono text-xs">${item.requestedSize || 'One Size'}</td>
-            <td class="p-2 text-right space-x-2">
-                <button data-action="confirm-issue" data-doc-id="${item.id}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition shadow-sm">
-                    <i class="fa-solid fa-hand-holding mr-1"></i> Hand Out & Issue
-                </button>
-                <button data-action="delete-request" data-doc-id="${item.id}" data-requested-size="${item.requestedSize || 'One Size'}" class="bg-red-500 hover:bg-red-600 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition shadow-sm" title="Cancel/Delete Request">
-                    <i class="fa-solid fa-trash-can mr-1"></i> Delete
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    container.innerHTML = pending.map(item => {
+        const targetId = item.id || item.docId;
+        return `
+            <tr class="border-b border-slate-100 hover:bg-amber-50/50 transition">
+                <td class="p-2 font-mono font-bold text-slate-900">${item.locationCode || 'N/A'}</td>
+                <td class="p-2 font-semibold text-slate-800">${item.title}</td>
+                <td class="p-2 text-slate-700">${item.requestedByName || 'Member'}</td>
+                <td class="p-2 font-mono text-xs">${item.requestedSize || 'One Size'}</td>
+                <td class="p-2 text-right space-x-2">
+                    <button data-action="confirm-issue" data-doc-id="${targetId}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition shadow-sm">
+                        <i class="fa-solid fa-hand-holding mr-1"></i> Hand Out & Issue
+                    </button>
+                    <button data-action="delete-request" data-doc-id="${targetId}" data-requested-size="${item.requestedSize || 'One Size'}" class="bg-red-500 hover:bg-red-600 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition shadow-sm" title="Cancel/Delete Request">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 /* --- INLINE QUICK STOCK ADJUSTMENT --- */
 async function quickAdjustItemStock(itemId, sizeKey, delta) {
-    const item = (AppState.supply || []).find(i => i.id === itemId);
+    const item = (AppState.supply || []).find(i => (i.id || i.docId) === itemId);
     if (!item) return;
 
     const stockMap = { ...(item.stock || { "One Size": 0 }) };
@@ -694,6 +731,7 @@ function renderAdminTable() {
     }
 
     bodyContainer.innerHTML = filtered.map(item => {
+        const itemId = item.id || item.docId;
         const stockMap = item.stock || { "One Size": 0 };
         const totalQty = Object.values(stockMap).reduce((sum, q) => sum + (parseInt(q, 10) || 0), 0);
         const thumbSrc = item.image && item.image.trim() !== "" ? item.image : ``;
@@ -704,14 +742,14 @@ function renderAdminTable() {
             <div class="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[11px] font-mono mr-1 mb-1">
                 <span class="font-bold text-slate-700">${sz}:</span>
                 <span class="font-extrabold text-slate-900 mx-0.5">${qty}</span>
-                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="-1" class="text-red-500 hover:text-red-700 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Decrease 1">-</button>
-                <button data-action="adjust-stock" data-doc-id="${item.id}" data-size-key="${sz}" data-delta="1" class="text-brand-600 hover:text-brand-800 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Increase 1">+</button>
+                <button data-action="adjust-stock" data-doc-id="${itemId}" data-size-key="${sz}" data-delta="-1" class="text-red-500 hover:text-red-700 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Decrease 1">-</button>
+                <button data-action="adjust-stock" data-doc-id="${itemId}" data-size-key="${sz}" data-delta="1" class="text-brand-600 hover:text-brand-800 hover:bg-slate-200 w-3.5 h-3.5 rounded flex items-center justify-center font-bold text-[10px]" title="Increase 1">+</button>
             </div>
         `).join('');
 
         let statusBadge = '';
         if (item.status === 'IN') {
-            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800">Stock</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800">In Stock</span>`;
         } else if (item.status === 'REQUESTED') {
             statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">Requested</span>`;
         } else if (item.status === 'ISSUED') {
@@ -719,7 +757,7 @@ function renderAdminTable() {
         } else if (item.status === 'VANGUARD') {
             statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">Vanguard</span>`;
         } else {
-            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Out</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Out of Stock</span>`;
         }
 
         const visibilityBadge = isHidden 
@@ -740,7 +778,6 @@ function renderAdminTable() {
                     ${inlineStockControls} 
                     <div class="text-[10px] text-slate-400 font-sans mt-0.5">Total: <strong class="text-brand-600">${totalQty}</strong></div>
                 </td>
-                <!-- Combined Status, Price & Visibility Column -->
                 <td class="p-2.5">
                     <div class="flex flex-col items-start gap-1">
                         <div class="flex items-center gap-1.5">
@@ -750,20 +787,19 @@ function renderAdminTable() {
                         ${visibilityBadge}
                     </div>
                 </td>
-                <!-- Streamlined Adjacent Actions Column -->
                 <td class="p-2.5 text-right">
                     <div class="inline-flex items-center gap-1 justify-end">
                         ${item.vanguardUrl ? `<a href="${item.vanguardUrl}" target="_blank" class="p-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-amber-600 transition" title="View Vanguard Product"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>` : ''}
                         
-                        <button data-action="toggle-visibility" data-doc-id="${item.id}" data-current-hidden="${isHidden}" title="${isHidden ? 'Hidden from catalog' : 'Visible in catalog'}" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 text-slate-600 transition">
+                        <button data-action="toggle-visibility" data-doc-id="${itemId}" data-current-hidden="${isHidden}" title="${isHidden ? 'Hidden from catalog' : 'Visible in catalog'}" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 text-slate-600 transition">
                             <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
                         </button>
                         
-                        <button data-action="direct-issue-item" data-doc-id="${item.id}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded-lg text-xs transition shadow-sm flex items-center gap-1">
+                        <button data-action="direct-issue-item" data-doc-id="${itemId}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded-lg text-xs transition shadow-sm flex items-center gap-1">
                             <i class="fa-solid fa-hand-holding-hand text-xs"></i> Issue
                         </button>
                         
-                        <button data-action="edit-item" data-doc-id="${item.id}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2 py-1 rounded-lg border border-slate-200 text-xs transition flex items-center gap-1">
+                        <button data-action="edit-item" data-doc-id="${itemId}" class="bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-700 font-bold px-2 py-1 rounded-lg border border-slate-200 text-xs transition flex items-center gap-1">
                             <i class="fa-solid fa-pen-to-square text-xs"></i> Edit
                         </button>
                     </div>
@@ -783,21 +819,19 @@ export function openItemModal(targetDocId = null) {
     const labelToggle = document.getElementById('label-cat-edit-toggle');
     if (labelToggle) labelToggle.textContent = 'Edit Category Names';
 
-    const item = (AppState.supply || []).find(i => i.id === targetDocId);
+    const item = (AppState.supply || []).find(i => (i.id || i.docId) === targetDocId);
     const imgPreview = document.getElementById('modal-image-preview');
     const hideCheckbox = document.getElementById('form-hide-from-catalog');
 
     if (targetDocId && item) {
         document.getElementById('modal-title').textContent = 'Edit Supply Item';
-        document.getElementById('form-doc-id').value = item.id;
+        document.getElementById('form-doc-id').value = item.id || item.docId;
         document.getElementById('form-location-code').value = item.locationCode || '';
         document.getElementById('form-location').value = item.location || '';
         document.getElementById('form-title').value = item.title || '';
         document.getElementById('form-price').value = item.price || '';
 
         renderCategoryCheckboxes(item.categories || [item.category].filter(Boolean));
-
-        // Render dynamic size rows
         renderSizeFormRows(item.stock || { "One Size": 0 });
 
         if (hideCheckbox) hideCheckbox.checked = item.hideFromCatalog === true || item.hideFromCatalog === 'true';
@@ -840,7 +874,6 @@ async function handleItemFormSubmit() {
         return;
     }
 
-    // Read stock directly from dynamic input rows
     const stockMap = getStockMapFromFormRows();
     const hideCheckbox = document.getElementById('form-hide-from-catalog');
     const selectedCategories = getSelectedCategoriesFromForm();

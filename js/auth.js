@@ -5,7 +5,9 @@ import {
     getUserProfile,
     loginUserAccount,
     registerUserAccount,
-    logoutUserAccount
+    logoutUserAccount,
+    resetUserPassword,
+    correctUserEmail
 } from '/js/firebase-db.js';
 
 export function initAuth(onUserChanged) {
@@ -163,5 +165,39 @@ window.handleUserLogout = async function () {
         if (typeof showToast === 'function') showToast("Signed out.");
     } catch (err) {
         console.error("Logout failed:", err);
+        window.showAlert("Logout failed", err.message, "error");
+    }
+};
+
+window.handlePasswordReset = async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('reset-email')?.value;
+
+    try {
+        await resetUserPassword(email);
+        alert(`Password reset link sent to ${email}. Please check your inbox and spam folder.`);
+        document.getElementById('btn-goto-login-from-reset')?.click();
+    } catch (error) {
+        alert(`Password Reset Failed: ${error.message}`);
+    }
+};
+
+window.handleUpdateEmail = async (e) => {
+    e.preventDefault();
+    const identifier = document.getElementById('update-user-identifier')?.value;
+    const password = document.getElementById('update-email-password')?.value;
+    const newEmail = document.getElementById('update-new-email')?.value;
+
+    try {
+        const updatedEmail = await correctUserEmail(identifier, password, newEmail);
+        alert(`Success! Your account email has been corrected to ${updatedEmail}. You can now sign in.`);
+
+        // Pre-fill corrected email into login input
+        const loginEmailInput = document.getElementById('login-email');
+        if (loginEmailInput) loginEmailInput.value = updatedEmail;
+
+        document.getElementById('btn-goto-login-from-update')?.click();
+    } catch (error) {
+        alert(`Email Correction Failed: ${error.message}`);
     }
 };

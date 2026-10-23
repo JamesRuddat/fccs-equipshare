@@ -42,7 +42,7 @@
 
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
 
-    <app-header></app-header>
+<app-header class="block min-h-[64px]"></app-header>
 
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
 
@@ -214,9 +214,11 @@
         class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-100">
             <div class="flex items-center justify-between pb-4 border-b border-slate-100">
-                <h3 class="text-base font-bold text-slate-900"><i
-                        class="fa-solid fa-hand-holding-hand text-indigo-600 mr-2"></i>Direct Issue Gear</h3>
-                <button type="button" id="btn-close-direct-issue-modal" class="text-slate-400 hover:text-slate-600 p-1">
+                <h3 class="text-base font-bold text-slate-900">
+                    <i class="fa-solid fa-hand-holding-hand text-indigo-600 mr-2"></i>Direct Issue Gear
+                </h3>
+                <button type="button" id="btn-close-direct-issue-modal"
+                    class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
@@ -231,22 +233,22 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Select Size</label>
                     <select id="direct-issue-size-select"
-                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500"></select>
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Assign To Member</label>
                     <select id="direct-issue-member-select"
-                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         required></select>
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                     <button type="button" id="btn-cancel-direct-issue-modal"
-                        class="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100">Cancel</button>
-                    <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
-                        Confirm & Issue Gear
+                        class="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                    <button type="submit" id="btn-submit-direct-issue"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-check text-xs"></i> Confirm & Issue Gear
                     </button>
                 </div>
             </form>
@@ -338,13 +340,19 @@
                     <div class="flex items-center justify-between">
                         <label class="block text-xs font-bold text-slate-600 uppercase">Stock & Sizes</label>
                         <div class="flex items-center gap-1 flex-wrap">
-      <span class="text-[10px] text-slate-400 font-bold mr-1">Presets:</span>
-      <button type="button" id="preset-s-m-l" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">S-M-L</button>
-      <button type="button" id="preset-ocp" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">OCP</button>
-      <button type="button" id="preset-hats" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Hats</button>
-      <button type="button" id="preset-female" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Female</button>
-      <button type="button" id="preset-dress-shirts" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Dress Shirts</button>
-    </div>
+                            <span class="text-[10px] text-slate-400 font-bold mr-1">Presets:</span>
+                            <button type="button" id="preset-s-m-l"
+                                class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">S-M-L</button>
+                            <button type="button" id="preset-ocp"
+                                class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">OCP</button>
+                            <button type="button" id="preset-hats"
+                                class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Hats</button>
+                            <button type="button" id="preset-female"
+                                class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Female</button>
+                            <button type="button" id="preset-dress-shirts"
+                                class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded transition cursor-pointer">Dress
+                                Shirts</button>
+                        </div>
                     </div>
 
                     <!-- Dynamic Size Rows Container -->
